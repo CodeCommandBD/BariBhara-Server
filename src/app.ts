@@ -28,6 +28,7 @@ app.post('/login', (req,res) => {
 // protected route 
 app.get('/profile', (req,res) => {
     res.send('Profile route');
+    
 })
 
 
