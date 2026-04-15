@@ -23,9 +23,11 @@ const registerUser = async (req: Req, res: Res) => {
       const hashedPassword = await bcrypt.hash(req.body.password, saltRounds);
   
       const newUser = new User({
-        name: req.body.name,
+        fullName: req.body.fullName,
         email: req.body.email,
         password: hashedPassword,
+        phone: req.body.phone,
+        role: req.body.role,
       });
   
       await newUser
@@ -36,8 +38,10 @@ const registerUser = async (req: Req, res: Res) => {
             message: "User registered successfully!",
             user: {
               id: newUser._id,
-              name: newUser.name,
+              fullName: newUser.fullName,
               email: newUser.email,
+              phone: newUser.phone,
+              role: newUser.role,
             },
           });
         })
@@ -85,7 +89,7 @@ const loginUser = async (req: Req, res: Res) =>{
     const token = jwt.sign(
       {
         id: user._id,
-        user: user.name,
+        user: user.fullName,
       },
       process.env.SECRET_KEY as string,
       {
