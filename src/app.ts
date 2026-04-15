@@ -1,12 +1,10 @@
 import express, { type Application } from "express";
 import "dotenv/config";
 import "../config/database.js";
+import "../config/passport.js"; 
 import cors from "cors";
-import jwt from "jsonwebtoken";
 import passport from "passport";
 import userRoutes from "../routes/user.routes.js";
-import User from "../models/user.model.js";
-import bcrypt from "bcrypt";
 const app: Application = express();
 
 
@@ -33,6 +31,18 @@ app.get(
       success: true,
       message: "Profile route reached!",
       user: req.user,
+    });
+  },
+);
+
+// logout route
+app.get(
+  "/logout",
+  passport.authenticate("jwt", { session: false }),
+  (req, res) => {
+    res.status(200).json({
+      success: true,
+      message: "Logout successful!",
     });
   },
 );
