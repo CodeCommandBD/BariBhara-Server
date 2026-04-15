@@ -101,6 +101,13 @@ const loginUser = async (req: Req, res: Res) =>{
       success: true,
       message: "User logged in successfully!",
       token: "Bearer " + token,
+      user: {
+        id: user._id,
+        fullName: user.fullName,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+      },
     });
   } catch (error) {
     console.log(error);
