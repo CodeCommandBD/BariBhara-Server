@@ -33,9 +33,17 @@ const registerUser = async (req: Req, res: Res) => {
       await newUser
         .save()
         .then(() => {
+          // Generate token for auto-login after registration
+          const token = jwt.sign(
+            { id: newUser._id, user: newUser.fullName },
+            process.env.SECRET_KEY as string,
+            { expiresIn: "48h" }
+          );
+
           return res.status(201).json({
             success: true,
             message: "User registered successfully!",
+            token: "Bearer " + token, // Send token for auto-login
             user: {
               id: newUser._id,
               fullName: newUser.fullName,
