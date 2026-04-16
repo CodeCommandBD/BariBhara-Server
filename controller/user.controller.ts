@@ -16,7 +16,7 @@ const registerUser = async (req: Req, res: Res) => {
       if (user) {
         return res.status(400).json({
           success: false,
-          message: "User already exists!",
+          message: "এই ইমেইল দিয়ে ইতেমধ্যেই অ্যাকাউন্ট খোলা আছে!",
         });
       }
   
@@ -42,7 +42,7 @@ const registerUser = async (req: Req, res: Res) => {
 
           return res.status(201).json({
             success: true,
-            message: "User registered successfully!",
+            message: "আপনার অ্যাকাউন্ট সফলভাবে তৈরি হয়েছে!",
             token: "Bearer " + token, // Send token for auto-login
             user: {
               id: newUser._id,
@@ -57,14 +57,14 @@ const registerUser = async (req: Req, res: Res) => {
           console.log(error);
           return res.status(500).json({
             success: false,
-            message: "Something went wrong!",
+            message: "দুঃখিত, কোনো একটি সমস্যা হয়েছে! আবার চেষ্টা করুন।",
           });
         });
     } catch (error) {
       console.log(error);
       return res.status(500).json({
         success: false,
-        message: "Something went wrong!",
+        message: "দুঃখিত, কোনো একটি সমস্যা হয়েছে! আবার চেষ্টা করুন।",
       });
     }
 };
@@ -78,7 +78,7 @@ const loginUser = async (req: Req, res: Res) =>{
     if (!user) {
       return res.status(400).json({
         success: false,
-        message: "User not found!",
+        message: "এই ইমেইল দিয়ে কোনো অ্যাকাউন্ট পাওয়া যায়নি!",
       });
     }
 
@@ -90,7 +90,7 @@ const loginUser = async (req: Req, res: Res) =>{
     if (!isPasswordValid) {
       return res.status(400).json({
         success: false,
-        message: "Invalid password!",
+        message: "ভুল পাসওয়ার্ড দিয়েছেন! আবার চেষ্টা করুন।",
       });
     }
 
@@ -107,7 +107,7 @@ const loginUser = async (req: Req, res: Res) =>{
 
     return res.status(200).json({
       success: true,
-      message: "User logged in successfully!",
+      message: "লগইন সফল হয়েছে! স্বাগতম।",
       token: "Bearer " + token,
       user: {
         id: user._id,
@@ -121,7 +121,7 @@ const loginUser = async (req: Req, res: Res) =>{
     console.log(error);
     return res.status(500).json({
       success: false,
-      message: "Something went wrong!",
+      message: "লগইন করতে সমস্যা হচ্ছে, দয়া করে আবার চেষ্টা করুন।",
     });
   }
 }
