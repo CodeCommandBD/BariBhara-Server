@@ -5,6 +5,10 @@ import "../config/passport.js";
 import cors from "cors";
 import passport from "passport";
 import userRoutes from "../routes/user.routes.js";
+
+import propertyRouter from "../routes/property.routes.js";
+import unitRouter from "../routes/unit.routes.js";
+
 const app: Application = express();
 
 
@@ -14,13 +18,26 @@ app.use(express.json());
 app.use(passport.initialize());
 
 // home route
-
 app.get("/", (req, res) => {
   res.send("Hello World!");
 });
 
-// auth routes
+
+// ==========================================
+// API Routes (এপিআই রাউটসমূহ)
+// ==========================================
+
+// ১. ইউজার এবং অথেন্টিকেশন রাউট (User Registration & Login)
 app.use("/api/auth/", userRoutes);
+
+// ২. বাড়ি বা প্রপার্টি ম্যানেজমেন্ট রাউট (Building & Property Management)
+app.use("/api/property", propertyRouter);
+
+// ৩. ফ্ল্যাট বা ইউনিট ম্যানেজমেন্ট রাউট (Flats, Rooms & Units Management)
+app.use("/api/unit", unitRouter);
+
+
+
 
 // protected route
 app.get(
