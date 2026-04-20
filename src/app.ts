@@ -8,6 +8,7 @@ import userRoutes from "../routes/user.routes.js";
 
 import propertyRouter from "../routes/property.routes.js";
 import unitRouter from "../routes/unit.routes.js";
+import dashboardRouter from "../routes/dashboard.routes.js"; // ড্যাশবোর্ড রাউট ইমপোর্ট
 
 const app: Application = express();
 
@@ -35,6 +36,9 @@ app.use("/api/property", propertyRouter);
 
 // ৩. ফ্ল্যাট বা ইউনিট ম্যানেজমেন্ট রাউট (Flats, Rooms & Units Management)
 app.use("/api/unit", unitRouter);
+
+// ৪. ড্যাশবোর্ড রাউট (Dashboard Management)
+app.use('/api/dashboard', dashboardRouter)
 
 
 
