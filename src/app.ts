@@ -18,6 +18,9 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(passport.initialize());
 
+// ছবি দেখার জন্য আপলোডস ফোল্ডারকে স্ট্যাটিক করা হলো
+app.use("/uploads", express.static("uploads"));
+
 // home route
 app.get("/", (req, res) => {
   res.send("Hello World!");
