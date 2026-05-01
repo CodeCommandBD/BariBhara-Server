@@ -33,7 +33,7 @@ const unitSchema = new mongoose.Schema({
   },
   currentTenant: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "User", // বর্তমানে রুমে কে আছে তার রেকর্ড
+    ref: "Tenant", // ভাড়াটিয়া মডেলের রেফারেন্স
   },
   createdAt: {
     type: Date,
