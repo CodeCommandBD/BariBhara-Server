@@ -1,66 +1,154 @@
 import type { Request as Req, Response as Res } from "express";
-import Property from "../models/property.model.js"; // প্রপার্টি মডেল ইমপোর্ট
-import Unit from "../models/unit.model.js"; // ইউনিট মডেল ইমপোর্ট
+import mongoose from "mongoose";
+import Property from "../models/property.model.js";
+import Unit from "../models/unit.model.js";
+import Invoice from "../models/invoice.model.js";
+import Transaction from "../models/transaction.model.js";
+import Tenant from "../models/tenant.model.js";
 
-// ড্যাশবোর্ডের সব পরিসংখ্যান (Stats) বের করার ফাংশন
+// ১. মেইন ড্যাশবোর্ড স্ট্যাটস (Property, Unit, Revenue, Occupancy)
 export const getLandlordStats = async (req: Req, res: Res) => {
   try {
-    // ১. পাসপোর্ট মিডলওয়্যার থেকে বর্তমানে লগইন করা ইউজারের আইডি নেওয়া
     const ownerId = (req as any).user.id;
+    const ownerObjectId = new mongoose.Types.ObjectId(ownerId);
 
-    // ২. বর্তমান ইউজারের মোট কয়টি বিল্ডিং আছে তা ডাটাবেসে গণনা করা
-    const totalProperties = await Property.countDocuments({ owner: ownerId });
+    // মোট প্রপার্টি
+    const totalProperties = await Property.countDocuments({ owner: ownerObjectId });
 
-    // ৩. ইউজারের সব বিল্ডিংগুলোর আইডি এর লিস্ট বের করা (যাতে ওই বিল্ডিংয়ের রুমগুলো খোঁজা যায়)
-    const propertyIds = await Property.find({ owner: ownerId }).distinct("_id");
+    // প্রপার্টি আইডি লিস্ট
+    const propertyIds = await Property.find({ owner: ownerObjectId }).distinct("_id");
 
-    // ৪. এই বিল্ডিংগুলোর আন্ডারে মোট কয়টি ইউনিট (রুম/ফ্ল্যাট) আছে তা গোনা
-    const totalUnits = await Unit.countDocuments({
-      property: { $in: propertyIds },
-    });
+    // মোট ইউনিট
+    const totalUnits = await Unit.countDocuments({ property: { $in: propertyIds } });
 
-    // ৫. বর্তমানে কতটি ইউনিট ভাড়া দেওয়া হয়েছে তা গোনা (status: "ভাড়া হয়েছে")
+    // ভাড়া হওয়া ইউনিট
     const rentedUnits = await Unit.countDocuments({
       property: { $in: propertyIds },
-      status: "ভাড়া হয়েছে",
+      status: "ভাড়া হয়েছে",
     });
 
-    // ৬. খালি ইউনিটের সংখ্যা বের করা (মোট ইউনিট - ভাড়া দেওয়া ইউনিট)
+    // খালি ইউনিট
     const availableUnits = totalUnits - rentedUnits;
 
-    // ৭. মোট মাসিক আয় বের করা (যেগুলো ভাড়া হয়েছে সেগুলোর রেন্ট যোগ করা)
-    // এটি MongoDB Aggregation ব্যবহার করে করা হচ্ছে
+    // অকুপেন্সি রেট
+    const occupancyRate = totalUnits > 0 ? Math.round((rentedUnits / totalUnits) * 100) : 0;
 
-    const revenueData = await Unit.aggregate([
-      // কন্ডিশন: শুধুমাত্র এই ইউজারের এবং যেগুলো ভাড়া হয়ে গেছে সেই ইউনিটগুলো নাও
-      { $match: { property: { $in: propertyIds }, status: "ভাড়া হয়েছে" } },
-      // গ্রুপ করো এবং সব ইউনিটের rent (ভাড়া) যোগ করো
-      { $group: { _id: null, totalRevenue: { $sum: "$rent" } } },
+    // এই মাসের মোট কালেকশন (Invoice থেকে)
+    const now = new Date();
+    const currentMonth = now.toLocaleString("en-us", { month: "long" });
+    const currentYear = now.getFullYear();
+
+    const monthlyRevenueData = await Invoice.aggregate([
+      { $match: { owner: ownerObjectId, month: currentMonth, year: currentYear } },
+      { $group: { _id: null, totalCollected: { $sum: "$paidAmount" } } },
     ]);
+    const totalRevenue = monthlyRevenueData.length > 0 ? monthlyRevenueData[0].totalCollected : 0;
 
-    // যদি কোনো ডাটা থাকে তবে তার যোগফল নাও, নাহলে ০ ধরো
-    const totalRevenue =
-      revenueData.length > 0 ? revenueData[0].totalRevenue : 0;
+    // মোট বকেয়া (Due)
+    const totalDueData = await Invoice.aggregate([
+      { $match: { owner: ownerObjectId, status: { $ne: "Paid" } } },
+      { $group: { _id: null, totalDue: { $sum: "$dueAmount" } } },
+    ]);
+    const totalDue = totalDueData.length > 0 ? totalDueData[0].totalDue : 0;
 
-    // ৮. অকুপেন্সি রেট (কত শতাংশ ভাড়া হয়েছে) বের করা
-    const occupancyRate =
-      totalUnits > 0 ? Math.round((rentedUnits / totalUnits) * 100) : 0;
-
-       // ৯. সব তথ্য একসাথে ফ্রন্টএন্ডে পাঠিয়ে দেওয়া
     res.status(200).json({
-        success: true,
-        stats: {
-        totalProperties, // মোট বিল্ডিং
-        totalUnits,      // মোট রুম
-        rentedUnits,     // ভাড়া হওয়া রুম
-        availableUnits,  // খালি রুম
-        totalRevenue,    // মোট মাসিক আয়
-        occupancyRate    // ভাড়ার হার (%)
-        }
-    })
-    
+      success: true,
+      stats: {
+        totalProperties,
+        totalUnits,
+        rentedUnits,
+        availableUnits,
+        totalRevenue,
+        totalDue,
+        occupancyRate,
+      },
+    });
   } catch (error: any) {
-    // কোনো ভুল হলে এরর মেসেজ পাঠানো
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ২. গত ৬ মাসের আয়ের ট্রেন্ড (Revenue Chart এর জন্য)
+export const getRevenueAnalytics = async (req: Req, res: Res) => {
+  try {
+    const ownerId = (req as any).user.id;
+    const ownerObjectId = new mongoose.Types.ObjectId(ownerId);
+
+    const months = [
+      "January", "February", "March", "April", "May", "June",
+      "July", "August", "September", "October", "November", "December",
+    ];
+    const monthsBn = [
+      "জানু", "ফেব্রু", "মার্চ", "এপ্রিল", "মে", "জুন",
+      "জুলাই", "আগস্ট", "সেপ্ট", "অক্টো", "নভে", "ডিসে",
+    ];
+
+    const now = new Date();
+    const revenueData = [];
+
+    // গত ৬ মাসের ডাটা বের করা
+    for (let i = 5; i >= 0; i--) {
+      const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const month = months[date.getMonth()];
+      const year = date.getFullYear();
+
+      const result = await Invoice.aggregate([
+        { $match: { owner: ownerObjectId, month, year } },
+        { $group: { _id: null, revenue: { $sum: "$paidAmount" }, due: { $sum: "$dueAmount" } } },
+      ]);
+
+      revenueData.push({
+        month: monthsBn[date.getMonth()],
+        revenue: result.length > 0 ? result[0].revenue : 0,
+        due: result.length > 0 ? result[0].due : 0,
+      });
+    }
+
+    res.status(200).json({ success: true, revenueData });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ৩. সাম্প্রতিক ট্রানজেকশন (Activity Table এর জন্য)
+export const getRecentTransactions = async (req: Req, res: Res) => {
+  try {
+    const ownerId = (req as any).user.id;
+    const ownerObjectId = new mongoose.Types.ObjectId(ownerId);
+
+    const transactions = await Transaction.find({ owner: ownerObjectId })
+      .populate("tenant", "name photo")
+      .populate({ path: "invoice", populate: { path: "property unit", select: "name unitName" } })
+      .sort({ paymentDate: -1 })
+      .limit(7);
+
+    res.status(200).json({ success: true, transactions });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ৪. লিজ এক্সপায়ারি অ্যালার্ট (আগামী ৩০ দিনের মধ্যে লিজ শেষ হবে)
+export const getLeaseExpiryAlerts = async (req: Req, res: Res) => {
+  try {
+    const ownerId = (req as any).user.id;
+    const ownerObjectId = new mongoose.Types.ObjectId(ownerId);
+
+    const today = new Date();
+    const in30Days = new Date();
+    in30Days.setDate(today.getDate() + 30);
+
+    const expiringTenants = await Tenant.find({
+      owner: ownerObjectId,
+      status: "সক্রিয়",
+      leaseEnd: { $gte: today, $lte: in30Days },
+    })
+      .populate("unit", "unitName")
+      .populate("property", "name")
+      .sort({ leaseEnd: 1 });
+
+    res.status(200).json({ success: true, expiringTenants });
+  } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });
   }
 };
