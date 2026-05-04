@@ -10,6 +10,7 @@ import propertyRouter from "../routes/property.routes.js";
 import unitRouter from "../routes/unit.routes.js";
 import dashboardRouter from "../routes/dashboard.routes.js";
 import tenantRouter from "../routes/tenant.routes.js"; // ভাড়াটিয়া রাউট ইমপোর্ট
+import rentRouter from "../routes/rent.routes.js";
 
 const app: Application = express();
 
@@ -46,6 +47,9 @@ app.use('/api/dashboard', dashboardRouter);
 
 // ৫. ভাড়াটিয়া ম্যানেজমেন্ট রাউট (Tenant Management)
 app.use('/api/tenant', tenantRouter);
+
+// ৬. ভাড়া ও পেমেন্ট ম্যানেজমেন্ট রাউট (Rent & Payment Management)
+app.use('/api/rent', rentRouter);
 
 
 
