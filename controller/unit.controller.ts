@@ -49,7 +49,7 @@ export const createUnit = async (req: Req, res: Res) => {
 export const getUnitsByProperty = async (req: Req, res: Res) => {
   try {
     const { propertyId } = req.params;
-    const units = await Unit.find({ property: propertyId as string });
+    const units = await Unit.find({ property: propertyId as string }).populate("currentTenant");
 
     res.status(200).json({
       success: true,
