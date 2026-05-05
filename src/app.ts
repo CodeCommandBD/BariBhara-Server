@@ -13,6 +13,8 @@ import tenantRouter from "../routes/tenant.routes.js"; // ভাড়াটি�
 import rentRouter from "../routes/rent.routes.js";
 import expenseRouter from "../routes/expense.routes.js";
 import reportsRouter from "../routes/reports.routes.js";
+import notificationRouter from "../routes/notification.routes.js";
+import profileRouter from "../routes/profile.routes.js";
 
 const app: Application = express();
 
@@ -58,6 +60,12 @@ app.use('/api/expense', expenseRouter);
 
 // ৮. রিপোর্ট রাউট (Reports & Analytics)
 app.use('/api/reports', reportsRouter);
+
+// ৯. নোটিফিকেশন, PDF রিসিট ও ইমেইল রাউট
+app.use('/api/notification', notificationRouter);
+
+// ১০. প্রোফাইল ও সেটিংস রাউট
+app.use('/api/profile', profileRouter);
 
 
 
