@@ -30,6 +30,12 @@ const tenantSchema = new mongoose.Schema(
       required: [true, "ফোন নম্বর আবশ্যক"],
       trim: true,
     },
+    email: {
+      type: String,
+      trim: true,
+      lowercase: true,
+      default: "",
+    },
     nid: {
       type: String,
       trim: true,
