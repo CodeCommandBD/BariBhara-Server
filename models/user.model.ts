@@ -26,6 +26,14 @@ const userSchema = new mongoose.Schema({
         enum: ["tenant", "landlord"],
         default: "tenant"
     },
+    photo: {
+        type: String,
+        default: ""
+    },
+    bio: {
+        type: String,
+        default: ""
+    },
     createdAt: {
         type: Date,
         default: Date.now
