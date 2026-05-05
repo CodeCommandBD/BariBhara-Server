@@ -117,3 +117,106 @@ export const getPropertiesForFilter = async (req: Req, res: Res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+// ৩. CSV ডাউনলোড (ট্রানজেকশন এক্সপোর্ট)
+export const exportTransactionsCSV = async (req: Req, res: Res) => {
+  try {
+    const ownerId = (req as any).user.id as string;
+    const ownerObjectId = new mongoose.Types.ObjectId(ownerId);
+    const { startDate, endDate } = req.query;
+
+    const filter: any = { owner: ownerObjectId };
+    if (startDate || endDate) {
+      filter.paymentDate = {};
+      if (startDate) filter.paymentDate.$gte = new Date(startDate as string);
+      if (endDate) filter.paymentDate.$lte = new Date(endDate as string);
+    }
+
+    const transactions = await Transaction.find(filter)
+      .populate("tenant", "name phone")
+      .populate({ path: "invoice", populate: { path: "property unit", select: "name unitName" } })
+      .sort({ paymentDate: -1 });
+
+    // CSV হেডার
+    const headers = [
+      "তারিখ", "ভাড়াটিয়া", "ফোন", "প্রপার্টি", "ইউনিট",
+      "মাস", "বছর", "পরিমাণ (৳)", "পেমেন্ট মেথড", "ট্রানজেকশন আইডি"
+    ];
+
+    // CSV রো তৈরি
+    const rows = transactions.map((txn: any) => [
+      new Date(txn.paymentDate).toLocaleDateString("en-BD"),
+      txn.tenant?.name || "—",
+      txn.tenant?.phone || "—",
+      txn.invoice?.property?.name || "—",
+      txn.invoice?.unit?.unitName || "—",
+      txn.invoice?.month || "—",
+      txn.invoice?.year || "—",
+      txn.amount,
+      txn.paymentMethod,
+      txn.transactionId || "—",
+    ]);
+
+    // CSV স্ট্রিং তৈরি
+    const csvContent = [
+      headers.join(","),
+      ...rows.map(row => row.map((cell: any) => `"${cell}"`).join(","))
+    ].join("\n");
+
+    // BOM যোগ করা (Bengali text এর জন্য Excel compatibility)
+    const bom = "\uFEFF";
+    const filename = `transactions-${new Date().toISOString().split("T")[0]}.csv`;
+
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.status(200).send(bom + csvContent);
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ৪. Expense CSV ডাউনলোড
+export const exportExpensesCSV = async (req: Req, res: Res) => {
+  try {
+    const ownerId = (req as any).user.id as string;
+    const ownerObjectId = new mongoose.Types.ObjectId(ownerId);
+    const { startDate, endDate } = req.query;
+
+    const filter: any = { owner: ownerObjectId };
+    if (startDate || endDate) {
+      filter.expenseDate = {};
+      if (startDate) filter.expenseDate.$gte = new Date(startDate as string);
+      if (endDate) filter.expenseDate.$lte = new Date(endDate as string);
+    }
+
+    const expenses = await Expense.find(filter)
+      .populate("property", "name")
+      .populate("unit", "unitName")
+      .sort({ expenseDate: -1 });
+
+    const headers = ["তারিখ", "বিবরণ", "ক্যাটাগরি", "প্রপার্টি", "ইউনিট", "পরিমাণ (৳)", "নোট"];
+    const rows = expenses.map((exp: any) => [
+      new Date(exp.expenseDate).toLocaleDateString("en-BD"),
+      exp.title || "—",
+      exp.category || "—",
+      exp.property?.name || "—",
+      exp.unit?.unitName || "—",
+      exp.amount,
+      exp.note || "—",
+    ]);
+
+    const csvContent = [
+      headers.join(","),
+      ...rows.map((row: any[]) => row.map((cell: any) => `"${cell}"`).join(","))
+    ].join("\n");
+
+    const bom = "\uFEFF";
+    const filename = `expenses-${new Date().toISOString().split("T")[0]}.csv`;
+
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.status(200).send(bom + csvContent);
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
