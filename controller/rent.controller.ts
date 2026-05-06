@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 import Invoice from "../models/invoice.model.js";
 import Transaction from "../models/transaction.model.js";
 import Tenant from "../models/tenant.model.js";
+import { clearDashboardCache } from "./dashboard.controller.js";
 
 // ১. নতুন ইনভয়েস/বিল তৈরি করা (Manual Generate)
 export const generateInvoice = async (req: Req, res: Res) => {
@@ -132,6 +133,9 @@ export const collectPayment = async (req: Req, res: Res) => {
       status: status,
     });
 
+    // পেমেন্ট সফল হলে ড্যাশবোর্ড ক্যাশ স্বয়ংক্রিয়ভাবে ক্লিয়ার
+    clearDashboardCache(ownerId);
+
     res.status(200).json({
       success: true,
       message: "পেমেন্ট সফলভাবে গ্রহণ করা হয়েছে!",
@@ -142,20 +146,38 @@ export const collectPayment = async (req: Req, res: Res) => {
   }
 };
 
-// ৩. মালিকের সব বকেয়া বিল (Pending Invoices)
+// ৩. মালিকের সব বকেয়া বিল (Pending Invoices) — Pagination সহ
 export const getPendingInvoices = async (req: Req, res: Res) => {
   try {
     const ownerId = (req as any).user.id as string;
-    const invoices = await Invoice.find({ 
-      owner: new mongoose.Types.ObjectId(ownerId), 
-      status: { $ne: "Paid" } 
-    })
-    .populate("tenant", "name phone")
-    .populate("unit", "unitName")
-    .populate("property", "name")
-    .sort({ createdAt: -1 });
 
-    res.status(200).json({ success: true, invoices });
+    const page = Math.max(1, parseInt(req.query.page as string) || 1);
+    const limit = Math.min(50, parseInt(req.query.limit as string) || 10);
+    const skip = (page - 1) * limit;
+
+    const filter = {
+      owner: new mongoose.Types.ObjectId(ownerId),
+      status: { $ne: "Paid" },
+    };
+
+    const [invoices, total] = await Promise.all([
+      Invoice.find(filter)
+        .populate("tenant", "name phone email")
+        .populate("unit", "unitName")
+        .populate("property", "name")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      Invoice.countDocuments(filter),
+    ]);
+
+    res.status(200).json({
+      success: true,
+      invoices,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+    });
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });
   }
