@@ -76,28 +76,43 @@ export const addTenant = async (req: Req, res: Res) => {
   }
 };
 
-// ২. একজন মালিকের সকল ভাড়াটিয়ার তালিকা
+// ২. একজন মালিকের সকল ভাড়াটিয়ার তালিকা (Pagination সহ)
 export const getAllTenants = async (req: Req, res: Res) => {
   try {
     const ownerId = (req as any).user.id as string;
 
-    const tenants = await Tenant.find({
+    const page = Math.max(1, parseInt(req.query.page as string) || 1);
+    const limit = Math.min(50, parseInt(req.query.limit as string) || 9);
+    const skip = (page - 1) * limit;
+
+    const filter = {
       owner: new mongoose.Types.ObjectId(ownerId),
       status: "সক্রিয়",
-    })
-      .populate("unit", "unitName floor type rent")
-      .populate("property", "name location")
-      .sort({ createdAt: -1 });
+    };
+
+    const [tenants, total] = await Promise.all([
+      Tenant.find(filter)
+        .populate("unit", "unitName floor type rent")
+        .populate("property", "name location")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      Tenant.countDocuments(filter),
+    ]);
 
     res.status(200).json({
       success: true,
       count: tenants.length,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
       tenants,
     });
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
 
 // ৩. একটি নির্দিষ্ট ইউনিটের বর্তমান ভাড়াটিয়া
 export const getTenantByUnit = async (req: Req, res: Res) => {
