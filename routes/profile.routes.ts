@@ -2,6 +2,9 @@ import express from "express";
 import { isAuthenticated } from "../middleware/isAuthenticated.js";
 import { getProfile, updateProfile, updateProfilePhoto, changePassword } from "../controller/profile.controller.js";
 import multer from "multer";
+import { validate } from "../middleware/validationMiddleware.js";
+import { updateProfileSchema, changePasswordSchema } from "../middleware/validate.js";
+import { uploadLimiter } from "../middleware/rateLimiter.js";
 
 const profileRouter = express.Router();
 
@@ -15,13 +18,13 @@ const upload = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 } }); // �
 // ১. প্রোফাইল দেখা
 profileRouter.get("/me", isAuthenticated, getProfile);
 
-// ২. প্রোফাইল তথ্য আপডেট
-profileRouter.patch("/update", isAuthenticated, updateProfile);
+// ২. প্রোফাইল তথ্য আপডেট — ভ্যালিডেশন সহ
+profileRouter.patch("/update", isAuthenticated, validate(updateProfileSchema), updateProfile);
 
-// ৩. প্রোফাইল ছবি আপডেট
-profileRouter.patch("/photo", isAuthenticated, upload.single("photo"), updateProfilePhoto);
+// ৩. প্রোফাইল ছবি আপডেট — আপলোড রেট লিমিট সহ
+profileRouter.patch("/photo", isAuthenticated, uploadLimiter, upload.single("photo"), updateProfilePhoto);
 
-// ৪. পাসওয়ার্ড পরিবর্তন
-profileRouter.patch("/password", isAuthenticated, changePassword);
+// ৪. পাসওয়ার্ড পরিবর্তন — ভ্যালিডেশন সহ
+profileRouter.patch("/password", isAuthenticated, validate(changePasswordSchema), changePassword);
 
 export default profileRouter;
