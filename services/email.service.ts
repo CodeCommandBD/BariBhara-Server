@@ -201,3 +201,4 @@ export const sendLeaseExpiryEmail = async (data: {
     html: getBaseTemplate(content),
   });
 };
+
