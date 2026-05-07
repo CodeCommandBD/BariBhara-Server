@@ -52,7 +52,7 @@ const getBaseTemplate = (content: string) => `
 </body>
 </html>`;
 
-// ১. পেমেন্ট রিসিট ইমেইল
+// ১. পেমেন্ট রিসিট ইমেইল (PDF attachment সহ)
 export const sendPaymentReceiptEmail = async (data: {
   tenantEmail: string;
   tenantName: string;
@@ -65,6 +65,8 @@ export const sendPaymentReceiptEmail = async (data: {
   year: number;
   paidDate: Date;
   remainingDue: number;
+  pdfBuffer?: Buffer;        // PDF attachment (optional)
+  invoiceNumber?: string;    // ইনভয়েস নম্বর
 }) => {
   const content = `
     <h2 style="color: #333; margin-bottom: 4px;">পেমেন্ট নিশ্চিতকরণ ✅</h2>
@@ -73,6 +75,11 @@ export const sendPaymentReceiptEmail = async (data: {
     <div class="amount">৳ ${data.amount.toLocaleString()}</div>
     
     <div class="card">
+      ${data.invoiceNumber ? `
+      <div class="row">
+        <span class="label">ইনভয়েস নম্বর</span>
+        <span class="value" style="color: #702ae1; font-family: monospace;">${data.invoiceNumber}</span>
+      </div>` : ""}
       <div class="row">
         <span class="label">প্রপার্টি</span>
         <span class="value">${data.propertyName}</span>
@@ -106,15 +113,29 @@ export const sendPaymentReceiptEmail = async (data: {
         </span>
       </div>
     </div>
-    <p style="color: #666; font-size: 13px; margin-top: 16px;">ধন্যবাদ আপনার সময়মতো পেমেন্টের জন্য।</p>
+    ${data.pdfBuffer ? `<p style="color: #666; font-size: 13px; margin-top: 16px;">📄 এই ইমেইলের সাথে আপনার <strong>PDF রিসিট</strong> যুক্ত করা হয়েছে।</p>` : ""}
+    <p style="color: #666; font-size: 13px; margin-top: 8px;">ধন্যবাদ আপনার সময়মতো পেমেন্টের জন্য।</p>
   `;
 
-  await transporter.sendMail({
+  const mailOptions: any = {
     from: `"বাড়িওয়ালা" <${process.env.EMAIL_USER}>`,
     to: data.tenantEmail,
     subject: `✅ পেমেন্ট গৃহীত — ৳${data.amount.toLocaleString()} | ${data.month} ${data.year}`,
     html: getBaseTemplate(content),
-  });
+  };
+
+  // PDF থাকলে attachment যোগ করা
+  if (data.pdfBuffer) {
+    mailOptions.attachments = [
+      {
+        filename: `Invoice-${data.invoiceNumber ?? "receipt"}.pdf`,
+        content: data.pdfBuffer,
+        contentType: "application/pdf",
+      },
+    ];
+  }
+
+  await transporter.sendMail(mailOptions);
 };
 
 // ২. ভাড়া বাকির রিমাইন্ডার ইমেইল

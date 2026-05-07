@@ -19,6 +19,7 @@ import notificationRouter from "../routes/notification.routes.js";
 import profileRouter from "../routes/profile.routes.js";
 import maintenanceRouter from "../routes/maintenance.routes.js";
 import searchRouter from "../routes/search.routes.js";
+import notificationsRouter from "../routes/notifications.routes.js";
 
 // Middleware
 import { generalLimiter, authLimiter, searchLimiter } from "../middleware/rateLimiter.js";
@@ -106,6 +107,9 @@ app.use("/api/maintenance", maintenanceRouter);
 
 // ১২. গ্লোবাল সার্চ — বিশেষ সার্চ রেট লিমিট
 app.use("/api/search", searchLimiter, searchRouter);
+
+// ১৩. Real-time Notifications
+app.use("/api/notifications", notificationsRouter);
 
 // ==========================================
 // Error Handlers
