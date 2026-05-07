@@ -1,24 +1,24 @@
 import express from "express";
 import { isAuthenticated } from "../middleware/isAuthenticated.js";
 import {
-  generateReceiptPDF,
-  sendReceiptByEmail,
-  sendRentReminders,
-  sendLeaseExpiryNotifications,
+  getMyNotifications,
+  markAllRead,
+  markOneRead,
+  clearAllNotifications,
 } from "../controller/notification.controller.js";
 
 const notificationRouter = express.Router();
 
-// ১. পেমেন্ট রিসিট PDF ডাউনলোড
-notificationRouter.get("/receipt/pdf/:transactionId", isAuthenticated, generateReceiptPDF);
+// ১. আমার সব নোটিফিকেশন
+notificationRouter.get("/", isAuthenticated, getMyNotifications);
 
-// ২. রিসিট ইমেইলে পাঠানো
-notificationRouter.post("/receipt/email/:transactionId", isAuthenticated, sendReceiptByEmail);
+// ২. সব পড়া হয়েছে মার্ক
+notificationRouter.patch("/read-all", isAuthenticated, markAllRead);
 
-// ৩. ভাড়া বাকির রিমাইন্ডার (বাল্ক)
-notificationRouter.post("/reminder/rent", isAuthenticated, sendRentReminders);
+// ৩. একটি পড়া হয়েছে মার্ক
+notificationRouter.patch("/:id/read", isAuthenticated, markOneRead);
 
-// ৪. লিজ এক্সপায়ারি নোটিফিকেশন (বাল্ক)
-notificationRouter.post("/reminder/lease", isAuthenticated, sendLeaseExpiryNotifications);
+// ৪. সব মুছে ফেলা
+notificationRouter.delete("/clear", isAuthenticated, clearAllNotifications);
 
 export default notificationRouter;
