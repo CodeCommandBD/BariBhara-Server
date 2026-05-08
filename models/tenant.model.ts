@@ -1,4 +1,5 @@
-import mongoose from "mongoose";
+ import mongoose from "mongoose";
+import bcrypt from "bcryptjs";
 
 const tenantSchema = new mongoose.Schema(
   {
@@ -41,11 +42,22 @@ const tenantSchema = new mongoose.Schema(
       trim: true,
     },
     photo: {
-      type: String, // Cloudinary URL
+      type: String,
       default: "",
     },
 
-    // ৩. চুক্তির তথ্য (Lease Info)
+    // ৩. পোর্টাল অ্যাক্সেস (Tenant Login)
+    portalPassword: {
+      type: String,
+      default: null, // মালিক সেট করলে enable হবে
+      select: false, // default query তে বাদ থাকবে
+    },
+    portalEnabled: {
+      type: Boolean,
+      default: false, // মালিক manually enable করবে
+    },
+
+    // ৪. চুক্তির তথ্য (Lease Info)
     rentAmount: {
       type: Number,
       required: [true, "ভাড়ার পরিমাণ আবশ্যক"],
@@ -61,10 +73,10 @@ const tenantSchema = new mongoose.Schema(
       required: [true, "চুক্তি শুরুর তারিখ আবশ্যক"],
     },
     leaseEnd: {
-      type: Date, // ঐচ্ছিক — মাসিক চুক্তিতে লাগে না
+      type: Date,
     },
 
-    // ৪. স্ট্যাটাস (Status)
+    // ৫. স্ট্যাটাস (Status)
     status: {
       type: String,
       enum: ["সক্রিয়", "চলে গেছে"],
@@ -72,9 +84,23 @@ const tenantSchema = new mongoose.Schema(
     },
   },
   {
-    timestamps: true, // createdAt ও updatedAt অটো যোগ হবে
+    timestamps: true,
   }
 );
+
+// Password hash করার আগে
+tenantSchema.pre("save", async function () {
+  const doc = this as any;
+  if (!doc.isModified("portalPassword") || !doc.portalPassword) return;
+  doc.portalPassword = await bcrypt.hash(doc.portalPassword as string, 10);
+});
+
+// Password compare method
+tenantSchema.methods["comparePassword"] = async function (candidatePassword: string): Promise<boolean> {
+  const doc = this as any;
+  if (!doc.portalPassword) return false;
+  return bcrypt.compare(candidatePassword, doc.portalPassword);
+};
 
 const Tenant = mongoose.model("Tenant", tenantSchema);
 export default Tenant;
