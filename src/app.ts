@@ -20,6 +20,7 @@ import profileRouter from "../routes/profile.routes.js";
 import maintenanceRouter from "../routes/maintenance.routes.js";
 import searchRouter from "../routes/search.routes.js";
 import notificationsRouter from "../routes/notifications.routes.js";
+import tenantPortalRouter from "../routes/tenantPortal.routes.js";
 
 // Middleware
 import { generalLimiter, authLimiter, searchLimiter } from "../middleware/rateLimiter.js";
@@ -110,6 +111,9 @@ app.use("/api/search", searchLimiter, searchRouter);
 
 // ১৩. Real-time Notifications
 app.use("/api/notifications", notificationsRouter);
+
+// ১৪. Tenant Portal
+app.use("/api/tenant-portal", tenantPortalRouter);
 
 // ==========================================
 // Error Handlers
