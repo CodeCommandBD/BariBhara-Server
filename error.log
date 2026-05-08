@@ -1,0 +1,16 @@
+TypeError: next is not a function
+    at model.<anonymous> (C:\Users\Shanto\Downloads\Programs\Rental Management System\server\models\tenant.model.ts:94:72)
+    at Kareem.execPre (C:\Users\Shanto\Downloads\Programs\Rental Management System\server\node_modules\kareem\index.js:68:39)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+TypeError: next is not a function
+    at model.<anonymous> (C:\Users\Shanto\Downloads\Programs\Rental Management System\server\models\tenant.model.ts:94:72)
+    at Kareem.execPre (C:\Users\Shanto\Downloads\Programs\Rental Management System\server\node_modules\kareem\index.js:68:39)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+TypeError: next is not a function
+    at model.<anonymous> (C:\Users\Shanto\Downloads\Programs\Rental Management System\server\models\tenant.model.ts:94:72)
+    at Kareem.execPre (C:\Users\Shanto\Downloads\Programs\Rental Management System\server\node_modules\kareem\index.js:68:39)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+TypeError: next is not a function
+    at model.<anonymous> (C:\Users\Shanto\Downloads\Programs\Rental Management System\server\models\tenant.model.ts:94:72)
+    at Kareem.execPre (C:\Users\Shanto\Downloads\Programs\Rental Management System\server\node_modules\kareem\index.js:68:39)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
