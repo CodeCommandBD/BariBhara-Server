@@ -7,6 +7,8 @@ import {
   getPendingInvoices,
   getInvoiceTransactions,
   getTenantRentHistory,
+  editInvoice,
+  deleteInvoice,
 } from "../controller/rent.controller.js";
 
 const rentRouter = express.Router();
@@ -28,5 +30,11 @@ rentRouter.get("/transactions/:invoiceId", isAuthenticated, getInvoiceTransactio
 
 // ৬. 📄 PDF Invoice Download (যেকোনো ইনভয়েসের PDF নামাবে)
 rentRouter.get("/invoice/:invoiceId/pdf", isAuthenticated, downloadInvoicePDF);
+
+// ৭. ইনভয়েস এডিট করা
+rentRouter.put("/edit/:invoiceId", isAuthenticated, editInvoice);
+
+// ৮. ইনভয়েস ডিলিট করা
+rentRouter.delete("/delete/:invoiceId", isAuthenticated, deleteInvoice);
 
 export default rentRouter;

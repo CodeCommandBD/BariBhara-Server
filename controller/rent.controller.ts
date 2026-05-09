@@ -287,7 +287,7 @@ export const downloadInvoicePDF = async (req: Req, res: Res) => {
   }
 };
 
-// ৪. মালিকের সব বকেয়া বিল (Pending Invoices) — Pagination সহ
+// ৪. সব ইনভয়েস — স্ট্যাটাস ফিল্টার সহ (Pagination)
 export const getPendingInvoices = async (req: Req, res: Res) => {
   try {
     const ownerId = (req as any).user.id as string;
@@ -296,21 +296,44 @@ export const getPendingInvoices = async (req: Req, res: Res) => {
     const limit = Math.min(50, parseInt(req.query.limit as string) || 10);
     const skip = (page - 1) * limit;
 
-    const filter = {
-      owner: new mongoose.Types.ObjectId(ownerId),
-      status: { $ne: "Paid" },
-    };
+    const statusFilter = req.query.status as string; // "all" | "Unpaid" | "Partial" | "Paid"
+    const monthFilter = req.query.month as string;
+    const yearFilter = req.query.year as string;
 
-    const [invoices, total] = await Promise.all([
-      Invoice.find(filter)
+    const baseFilter: any = { owner: new mongoose.Types.ObjectId(ownerId) };
+
+    if (statusFilter && statusFilter !== "all") {
+      baseFilter.status = statusFilter;
+    }
+    if (monthFilter) baseFilter.month = monthFilter;
+    if (yearFilter) baseFilter.year = Number(yearFilter);
+
+    // Aggregated stats (always across all statuses)
+    const statsFilter = { owner: new mongoose.Types.ObjectId(ownerId) };
+    const [invoices, total, stats] = await Promise.all([
+      Invoice.find(baseFilter)
         .populate("tenant", "name phone email")
         .populate("unit", "unitName")
         .populate("property", "name")
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit),
-      Invoice.countDocuments(filter),
+      Invoice.countDocuments(baseFilter),
+      Invoice.aggregate([
+        { $match: statsFilter },
+        {
+          $group: {
+            _id: "$status",
+            count: { $sum: 1 },
+            totalDue: { $sum: "$dueAmount" },
+          },
+        },
+      ]),
     ]);
+
+    // Build stats map
+    const statsMap: Record<string, any> = { Unpaid: { count: 0, totalDue: 0 }, Partial: { count: 0, totalDue: 0 }, Paid: { count: 0, totalDue: 0 } };
+    stats.forEach((s) => { if (statsMap[s._id]) statsMap[s._id] = { count: s.count, totalDue: s.totalDue }; });
 
     res.status(200).json({
       success: true,
@@ -318,6 +341,7 @@ export const getPendingInvoices = async (req: Req, res: Res) => {
       total,
       page,
       totalPages: Math.ceil(total / limit),
+      stats: statsMap,
     });
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });
@@ -353,6 +377,70 @@ export const getInvoiceTransactions = async (req: Req, res: Res) => {
       .sort({ paymentDate: -1 });
       
     res.status(200).json({ success: true, transactions });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ৭. ইনভয়েস এডিট করা (শুধুমাত্র Unpaid স্ট্যাটাসের জন্য)
+export const editInvoice = async (req: Req, res: Res) => {
+  try {
+    const ownerId = (req as any).user.id as string;
+    const invoiceId = req.params.invoiceId as string;
+    const { waterBill, gasBill, electricityBill, serviceCharge, otherBill, dueDate } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(invoiceId)) {
+      return res.status(400).json({ success: false, message: "অবৈধ ইনভয়েস আইডি!" });
+    }
+
+    const invoice = await Invoice.findOne({ _id: invoiceId, owner: ownerId });
+    if (!invoice) return res.status(404).json({ success: false, message: "ইনভয়েস পাওয়া যায়নি!" });
+
+    if (invoice.status !== "Unpaid") {
+      return res.status(400).json({ success: false, message: "পেমেন্ট গ্রহণ করা বিল এডিট করা সম্ভব নয়।" });
+    }
+
+    const totalAmount = invoice.baseRent + Number(waterBill || 0) + Number(gasBill || 0) + Number(electricityBill || 0) + Number(serviceCharge || 0) + Number(otherBill || 0);
+
+    invoice.waterBill = Number(waterBill || 0);
+    invoice.gasBill = Number(gasBill || 0);
+    invoice.electricityBill = Number(electricityBill || 0);
+    invoice.serviceCharge = Number(serviceCharge || 0);
+    invoice.otherBill = Number(otherBill || 0);
+    invoice.totalAmount = totalAmount;
+    invoice.dueAmount = totalAmount; // Because it's unpaid
+    if (dueDate) invoice.dueDate = new Date(dueDate);
+
+    await invoice.save();
+    clearDashboardCache(ownerId);
+
+    res.status(200).json({ success: true, message: "বিল সফলভাবে আপডেট হয়েছে!", invoice });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ৮. ইনভয়েস ডিলিট করা (শুধুমাত্র Unpaid স্ট্যাটাসের জন্য)
+export const deleteInvoice = async (req: Req, res: Res) => {
+  try {
+    const ownerId = (req as any).user.id as string;
+    const invoiceId = req.params.invoiceId as string;
+
+    if (!mongoose.Types.ObjectId.isValid(invoiceId)) {
+      return res.status(400).json({ success: false, message: "অবৈধ ইনভয়েস আইডি!" });
+    }
+
+    const invoice = await Invoice.findOne({ _id: invoiceId, owner: ownerId });
+    if (!invoice) return res.status(404).json({ success: false, message: "ইনভয়েস পাওয়া যায়নি!" });
+
+    if (invoice.status !== "Unpaid") {
+      return res.status(400).json({ success: false, message: "পেমেন্ট গ্রহণ করা বিল ডিলিট করা সম্ভব নয়।" });
+    }
+
+    await invoice.deleteOne();
+    clearDashboardCache(ownerId);
+
+    res.status(200).json({ success: true, message: "বিল সফলভাবে বাতিল করা হয়েছে!" });
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });
   }
