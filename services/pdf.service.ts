@@ -1,6 +1,16 @@
 import PDFDocument from "pdfkit";
 import { PassThrough } from "stream";
 
+// বাংলা মাসের নাম → English (Helvetica ফন্ট বাংলা সাপোর্ট করে না)
+const MONTH_BN_TO_EN: Record<string, string> = {
+  "জানুয়ারি": "January",   "ফেব্রুয়ারি": "February",
+  "মার্চ": "March",       "এপ্রিল": "April",
+  "মে": "May",           "জুন": "June",
+  "জুলাই": "July",        "আগস্ট": "August",
+  "সেপ্টেম্বর": "September", "অক্টোবর": "October",
+  "নভেম্বর": "November",   "ডিসেম্বর": "December",
+};
+
 // ====================================================
 // PDF Invoice Data Type
 // ====================================================
@@ -69,14 +79,14 @@ export const generateInvoicePDF = (data: InvoicePDFData): Promise<Buffer> => {
       .fontSize(14)
       .fill(PURPLE)
       .font("Helvetica-Bold")
-      .text("BW", margin + 12, 43);
+      .text("BB", margin + 12, 43);
 
     // হেডার টেক্সট
     doc
       .fontSize(22)
       .fill(WHITE)
       .font("Helvetica-Bold")
-      .text("Bariowla Property Management", margin + 65, 32);
+      .text("Bari Bhara", margin + 65, 32);
 
     doc
       .fontSize(10)
@@ -84,24 +94,16 @@ export const generateInvoicePDF = (data: InvoicePDFData): Promise<Buffer> => {
       .font("Helvetica")
       .text("baribhara.com | Professional Rental Solutions", margin + 65, 58);
 
-    // ইনভয়েস ব্যাজ (ডানদিকে)
-    const badgeColor = data.status === "Paid" ? GREEN : data.status === "Partial" ? "#d97706" : RED;
-    doc.roundedRect(pageW - margin - 120, 28, 120, 80, 8).fill("rgba(255,255,255,0.1)");
-    doc
-      .fontSize(9)
-      .fill(WHITE)
-      .font("Helvetica")
-      .text("INVOICE", pageW - margin - 110, 40, { width: 100, align: "center" });
-    doc
-      .fontSize(9)
-      .fill(WHITE)
-      .font("Helvetica-Bold")
-      .text(`#${data.invoiceNumber}`, pageW - margin - 110, 55, { width: 100, align: "center" });
-    doc
-      .fontSize(9)
-      .fill(badgeColor)
-      .font("Helvetica-Bold")
-      .text(data.status === "Paid" ? "● PAID" : data.status === "Partial" ? "● PARTIAL" : "● UNPAID", pageW - margin - 110, 80, { width: 100, align: "center" });
+    // Status badge — colored pill (no bullet character, Helvetica can't render it)
+    const badgeLabel = data.status === "Paid" ? "PAID" : data.status === "Partial" ? "PARTIAL" : "UNPAID";
+    const badgeBg   = data.status === "Paid" ? GREEN  : data.status === "Partial" ? "#d97706" : RED;
+    doc.roundedRect(pageW - margin - 100, 35, 100, 28, 6).fill(badgeBg);
+    doc.fontSize(10).fill(WHITE).font("Helvetica-Bold")
+       .text(badgeLabel, pageW - margin - 100, 43, { width: 100, align: "center" });
+
+    // Invoice number below badge (no background box — PDFKit doesn't support rgba transparency)
+    doc.fontSize(8).fill(WHITE).font("Helvetica")
+       .text(`# ${data.invoiceNumber}`, pageW - margin - 100, 76, { width: 100, align: "center" });
 
     // ====================================================
     // TENANT INFO SECTION
@@ -117,8 +119,9 @@ export const generateInvoicePDF = (data: InvoicePDFData): Promise<Buffer> => {
 
     // ডান — পেমেন্ট তথ্য
     const rightX = margin + contentW / 2 + 10;
+    const monthEN = MONTH_BN_TO_EN[data.month] ?? data.month; // fallback to original if already English
     doc.fontSize(8).fill(GRAY).font("Helvetica").text("PAYMENT INFO", rightX, y + 12);
-    doc.fontSize(11).fill(DARK).font("Helvetica-Bold").text(`${data.month} ${data.year}`, rightX, y + 26);
+    doc.fontSize(11).fill(DARK).font("Helvetica-Bold").text(`${monthEN} ${data.year}`, rightX, y + 26);
     doc.fontSize(9).fill(GRAY).font("Helvetica").text(`Date: ${new Date(data.paymentDate).toLocaleDateString("en-GB")}`, rightX, y + 44);
     doc.fontSize(9).fill(GRAY).text(`Method: ${data.paymentMethod}`, rightX, y + 58);
     if (data.transactionId) {
@@ -132,7 +135,7 @@ export const generateInvoicePDF = (data: InvoicePDFData): Promise<Buffer> => {
     doc.rect(margin, y, contentW, 28).fill(DARK);
     doc.fontSize(9).fill(WHITE).font("Helvetica-Bold");
     doc.text("DESCRIPTION", margin + 15, y + 10);
-    doc.text("AMOUNT (৳)", pageW - margin - 100, y + 10, { width: 90, align: "right" });
+    doc.text("AMOUNT (BDT)", pageW - margin - 100, y + 10, { width: 90, align: "right" });
 
     // ====================================================
     // BILLING ROWS
@@ -206,7 +209,7 @@ export const generateInvoicePDF = (data: InvoicePDFData): Promise<Buffer> => {
     doc.rect(margin + contentW / 2 + 10, y, contentW / 2 - 10, 60).fill(LIGHT_BG).stroke(BORDER);
     doc.fontSize(8).fill(GRAY).font("Helvetica").text("GENERATED ON", margin + contentW / 2 + 25, y + 10);
     doc.fontSize(10).fill(DARK).font("Helvetica-Bold").text(new Date().toLocaleDateString("en-GB"), margin + contentW / 2 + 25, y + 24);
-    doc.fontSize(8).fill(GRAY).font("Helvetica").text("Bariowla — Digital Receipt", margin + contentW / 2 + 25, y + 44);
+    doc.fontSize(8).fill(GRAY).font("Helvetica").text("Bari Bhara — Digital Receipt", margin + contentW / 2 + 25, y + 44);
 
     // ====================================================
     // FOOTER
@@ -218,7 +221,7 @@ export const generateInvoicePDF = (data: InvoicePDFData): Promise<Buffer> => {
       .fill(WHITE)
       .font("Helvetica")
       .text(
-        "This is a computer-generated invoice. No physical signature required. | Bariowla Property Management System",
+        "This is a computer-generated invoice. No physical signature required. | Bari Bhara Rental Management System",
         margin,
         footerY + 5,
         { width: contentW, align: "center" }
@@ -234,5 +237,5 @@ export const generateInvoicePDF = (data: InvoicePDFData): Promise<Buffer> => {
 export const generateInvoiceNumber = (invoiceId: string): string => {
   const timestamp = Date.now().toString().slice(-6);
   const idSlice = invoiceId.slice(-4).toUpperCase();
-  return `BW-${timestamp}-${idSlice}`;
+  return `BB-${timestamp}-${idSlice}`;
 };
