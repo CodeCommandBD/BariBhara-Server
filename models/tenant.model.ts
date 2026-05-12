@@ -75,8 +75,28 @@ const tenantSchema = new mongoose.Schema(
     leaseEnd: {
       type: Date,
     },
+    autoRenew: {
+      type: Boolean,
+      default: false,
+    },
+    renewalMonths: {
+      type: Number,
+      default: 12,
+      min: 1,
+      max: 60,
+    },
 
-    // ৫. স্ট্যাটাস (Status)
+    // ৬. ডকুমেন্টস (Documents)
+    documents: [
+      {
+        type: { type: String, enum: ["nid", "photo", "contract", "other"], default: "other" },
+        url: { type: String, required: true },
+        publicId: { type: String, required: true },
+        uploadedAt: { type: Date, default: Date.now },
+      },
+    ],
+
+    // ৭. স্ট্যাটাস (Status)
     status: {
       type: String,
       enum: ["সক্রিয়", "চলে গেছে"],
