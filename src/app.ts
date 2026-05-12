@@ -21,6 +21,10 @@ import maintenanceRouter from "../routes/maintenance.routes.js";
 import searchRouter from "../routes/search.routes.js";
 import notificationsRouter from "../routes/notifications.routes.js";
 import tenantPortalRouter from "../routes/tenantPortal.routes.js";
+import bulkRouter from "../routes/bulk.routes.js";
+import documentRouter from "../routes/document.routes.js";
+import twofaRouter from "../routes/twofa.routes.js";
+import { startScheduler } from "../services/scheduler.service.js";
 
 // Middleware
 import { generalLimiter, authLimiter, searchLimiter } from "../middleware/rateLimiter.js";
@@ -114,6 +118,18 @@ app.use("/api/notifications", notificationsRouter);
 
 // ১৪. Tenant Portal
 app.use("/api/tenant-portal", tenantPortalRouter);
+
+// ১৫. Bulk Operations & Lease Management
+app.use("/api/bulk", bulkRouter);
+
+// ১৬. Document Management
+app.use("/api/documents", documentRouter);
+
+// ১৭. Two-Factor Authentication
+app.use("/api/2fa", twofaRouter);
+
+// ১৮. Start Scheduler (Lease Auto-renewal)
+startScheduler();
 
 // ==========================================
 // Error Handlers
