@@ -4,6 +4,8 @@ import Invoice from "../models/invoice.model.js";
 import Transaction from "../models/transaction.model.js";
 import Expense from "../models/expense.model.js";
 import Property from "../models/property.model.js";
+import Tenant from "../models/tenant.model.js";
+import Unit from "../models/unit.model.js";
 
 // ১. ফিনান্সিয়াল রিপোর্ট (তারিখ রেঞ্জ ও প্রপার্টি অনুযায়ী ফিল্টার)
 export const getFinancialReport = async (req: Req, res: Res) => {
@@ -32,9 +34,12 @@ export const getFinancialReport = async (req: Req, res: Res) => {
       .populate("tenant", "name phone")
       .populate({
         path: "invoice",
+        select: "month year dueAmount totalAmount paidAmount",
         populate: { path: "property unit", select: "name unitName" },
       })
-      .sort({ paymentDate: -1 });
+      .sort({ _id: -1 }); // MongoDB ObjectId-এ timestamp embedded — সর্বশেষ entry সবার উপরে
+
+
 
     // মোট কালেকশন
     const totalCollection = transactions.reduce((sum, t) => sum + t.amount, 0);
@@ -216,6 +221,126 @@ export const exportExpensesCSV = async (req: Req, res: Res) => {
     res.setHeader("Content-Type", "text/csv; charset=utf-8");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
     res.status(200).send(bom + csvContent);
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+// ৫. মাসিক ট্রেন্ড — গত ১২ মাসের আয় বনাম খরচ
+export const getMonthlyTrend = async (req: Req, res: Res) => {
+  try {
+    const ownerId = (req as any).user.id as string;
+    const ownerObjectId = new mongoose.Types.ObjectId(ownerId);
+
+    const months: { month: string; year: number; আয়: number; খরচ: number; বকেয়া: number }[] = [];
+    const now = new Date();
+
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const start = new Date(d.getFullYear(), d.getMonth(), 1);
+      const end = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59);
+
+      const [txnAgg, expAgg, dueAgg] = await Promise.all([
+        Transaction.aggregate([
+          { $match: { owner: ownerObjectId, paymentDate: { $gte: start, $lte: end } } },
+          { $group: { _id: null, total: { $sum: "$amount" } } },
+        ]),
+        Expense.aggregate([
+          { $match: { owner: ownerObjectId, expenseDate: { $gte: start, $lte: end } } },
+          { $group: { _id: null, total: { $sum: "$amount" } } },
+        ]),
+        Invoice.aggregate([
+          { $match: { owner: ownerObjectId, status: { $ne: "Paid" }, createdAt: { $gte: start, $lte: end } } },
+          { $group: { _id: null, total: { $sum: "$dueAmount" } } },
+        ]),
+      ]);
+
+      const monthNames = ["জান", "ফেব", "মার", "এপ্র", "মে", "জুন", "জুল", "আগ", "সেপ", "অক্ট", "নভ", "ডিস"];
+      months.push({
+        month: `${monthNames[d.getMonth()]} '${String(d.getFullYear()).slice(-2)}`,
+        year: d.getFullYear(),
+        আয়: txnAgg[0]?.total ?? 0,
+        খরচ: expAgg[0]?.total ?? 0,
+        বকেয়া: dueAgg[0]?.total ?? 0,
+      });
+    }
+
+    res.status(200).json({ success: true, trend: months });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ৬. Occupancy Rate
+export const getOccupancyStats = async (req: Req, res: Res) => {
+  try {
+    const ownerId = (req as any).user.id as string;
+    const ownerObjectId = new mongoose.Types.ObjectId(ownerId);
+
+    const [totalUnits, occupiedUnits] = await Promise.all([
+      Unit.countDocuments({ owner: ownerObjectId }),
+      Tenant.countDocuments({ owner: ownerObjectId, status: "সক্রিয়" }),
+    ]);
+
+    const rate = totalUnits > 0 ? Math.round((occupiedUnits / totalUnits) * 100) : 0;
+    res.status(200).json({ success: true, totalUnits, occupiedUnits, rate });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ৭. Excel Export (transactions + expenses উভয়ই একটি ফাইলে)
+export const exportExcel = async (req: Req, res: Res) => {
+  try {
+    const ownerId = (req as any).user.id as string;
+    const ownerObjectId = new mongoose.Types.ObjectId(ownerId);
+    const { startDate, endDate } = req.query;
+
+    const filter: any = { owner: ownerObjectId };
+    if (startDate || endDate) {
+      filter.paymentDate = {};
+      if (startDate) filter.paymentDate.$gte = new Date(startDate as string);
+      if (endDate) filter.paymentDate.$lte = new Date(endDate as string);
+    }
+
+    const [transactions, expenses] = await Promise.all([
+      Transaction.find(filter)
+        .populate("tenant", "name phone")
+        .populate({ path: "invoice", populate: { path: "property unit", select: "name unitName" } })
+        .sort({ paymentDate: -1 }),
+      Expense.find({
+        owner: ownerObjectId,
+        ...(startDate || endDate ? {
+          expenseDate: {
+            ...(startDate ? { $gte: new Date(startDate as string) } : {}),
+            ...(endDate ? { $lte: new Date(endDate as string) } : {}),
+          }
+        } : {})
+      }).populate("property", "name").sort({ expenseDate: -1 }),
+    ]);
+
+    // Excel ডেটা সিরিয়ালাইজ করে JSON হিসেবে পাঠাই — client-এ xlsx দিয়ে render হবে
+    const txnData = transactions.map((t: any) => ({
+      তারিখ: new Date(t.paymentDate).toLocaleDateString("en-BD"),
+      ভাড়াটিয়া: t.tenant?.name ?? "—",
+      ফোন: t.tenant?.phone ?? "—",
+      প্রপার্টি: t.invoice?.property?.name ?? "—",
+      ইউনিট: t.invoice?.unit?.unitName ?? "—",
+      মাস: t.invoice?.month ?? "—",
+      বছর: t.invoice?.year ?? "—",
+      "পরিমাণ (৳)": t.amount,
+      "পেমেন্ট মেথড": t.paymentMethod,
+    }));
+
+    const expData = expenses.map((e: any) => ({
+      তারিখ: new Date(e.expenseDate).toLocaleDateString("en-BD"),
+      বিবরণ: e.title ?? "—",
+      ক্যাটাগরি: e.category ?? "—",
+      প্রপার্টি: e.property?.name ?? "—",
+      "পরিমাণ (৳)": e.amount,
+      নোট: e.note ?? "—",
+    }));
+
+    res.status(200).json({ success: true, transactions: txnData, expenses: expData });
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });
   }

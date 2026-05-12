@@ -26,7 +26,7 @@ const transactionSchema = new mongoose.Schema({
     default: "Cash",
   },
   transactionId: {
-    type: String, // বিকাশ বা নগদের ট্রানজেকশন আইডি (ঐচ্ছিক)
+    type: String,
     trim: true,
   },
   paymentDate: {
@@ -36,7 +36,7 @@ const transactionSchema = new mongoose.Schema({
   note: {
     type: String,
   },
-});
+}, { timestamps: true }); // createdAt ও updatedAt অটোম্যাটিক
 
 const Transaction = mongoose.model("Transaction", transactionSchema);
 export default Transaction;

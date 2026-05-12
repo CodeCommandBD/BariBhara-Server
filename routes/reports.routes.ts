@@ -1,6 +1,14 @@
 import express from "express";
 import { isAuthenticated } from "../middleware/isAuthenticated.js";
-import { getFinancialReport, getPropertiesForFilter, exportTransactionsCSV, exportExpensesCSV } from "../controller/reports.controller.js";
+import {
+  getFinancialReport,
+  getPropertiesForFilter,
+  exportTransactionsCSV,
+  exportExpensesCSV,
+  getMonthlyTrend,
+  getOccupancyStats,
+  exportExcel,
+} from "../controller/reports.controller.js";
 
 const reportsRouter = express.Router();
 
@@ -15,5 +23,14 @@ reportsRouter.get("/export/transactions", isAuthenticated, exportTransactionsCSV
 
 // ৪. খরচ CSV ডাউনলোড
 reportsRouter.get("/export/expenses", isAuthenticated, exportExpensesCSV);
+
+// ৫. মাসিক ট্রেন্ড (গত ১২ মাস)
+reportsRouter.get("/monthly-trend", isAuthenticated, getMonthlyTrend);
+
+// ৬. Occupancy Rate
+reportsRouter.get("/occupancy", isAuthenticated, getOccupancyStats);
+
+// ৭. Excel Export
+reportsRouter.get("/export/excel", isAuthenticated, exportExcel);
 
 export default reportsRouter;
