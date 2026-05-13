@@ -101,7 +101,30 @@ export const verifyLoginOTP = async (req: Req, res: Res) => {
     if (stored.otp !== otp) return res.status(400).json({ success: false, message: "OTP সঠিক নয়" });
 
     otpStore.delete(userId);
-    res.status(200).json({ success: true, message: "লগইন সফল হয়েছে" });
+
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ success: false, message: "ইউজার পাওয়া যায়নি" });
+
+    const jwt = require("jsonwebtoken");
+    const token = jwt.sign(
+      { id: user._id, user: user.fullName },
+      process.env.SECRET_KEY as string,
+      { expiresIn: "48h" }
+    );
+
+    res.status(200).json({ 
+      success: true, 
+      message: "লগইন সফল হয়েছে",
+      token: "Bearer " + token,
+      user: {
+        id: user._id,
+        fullName: user.fullName,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+        twoFactorEnabled: user.twoFactorEnabled
+      }
+    });
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });
   }

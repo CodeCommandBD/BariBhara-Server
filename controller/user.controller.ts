@@ -88,6 +88,16 @@ const loginUser = async (req: Req, res: Res) => {
       });
     }
 
+    if (user.twoFactorEnabled) {
+      return res.status(200).json({
+        success: true,
+        message: "লগইনের জন্য 2FA ভেরিফিকেশন প্রয়োজন।",
+        requires2FA: true,
+        userId: user._id,
+        email: user.email,
+      });
+    }
+
     const token = jwt.sign(
       { id: user._id, user: user.fullName },
       process.env.SECRET_KEY as string,
@@ -104,6 +114,7 @@ const loginUser = async (req: Req, res: Res) => {
         email: user.email,
         phone: user.phone,
         role: user.role,
+        twoFactorEnabled: user.twoFactorEnabled
       },
     });
   } catch (error) {
