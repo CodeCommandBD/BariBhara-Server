@@ -218,3 +218,73 @@ export const vacateTenant = async (req: Req, res: Res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+// ৬. Auto Renew টগল করা
+export const toggleAutoRenew = async (req: Req, res: Res) => {
+  try {
+    const id = req.params.id as string;
+    const ownerId = (req as any).user.id as string;
+    const { autoRenew } = req.body;
+
+    if (!id || !mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: "অবৈধ আইডি!" });
+    }
+
+    const tenant = await Tenant.findById(id);
+    if (!tenant) {
+      return res.status(404).json({ success: false, message: "ভাড়াটিয়া খুঁজে পাওয়া যায়নি!" });
+    }
+
+    if (String(tenant.owner) !== ownerId) {
+      return res.status(403).json({ success: false, message: "আপনার এই অপারেশনের অনুমতি নেই!" });
+    }
+
+    tenant.autoRenew = autoRenew;
+    await tenant.save();
+
+    res.status(200).json({
+      success: true,
+      message: `অটো-রিনিউয়াল ${autoRenew ? 'চালু' : 'বন্ধ'} করা হয়েছে`,
+      autoRenew: tenant.autoRenew
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ৭. ম্যানুয়াল রিনিউ (মেয়াদ বাড়ানো)
+export const renewLease = async (req: Req, res: Res) => {
+  try {
+    const id = req.params.id as string;
+    const ownerId = (req as any).user.id as string;
+    const { newEndDate } = req.body;
+
+    if (!id || !mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: "অবৈধ আইডি!" });
+    }
+
+    if (!newEndDate) {
+      return res.status(400).json({ success: false, message: "নতুন মেয়াদ শেষ হওয়ার তারিখ প্রয়োজন!" });
+    }
+
+    const tenant = await Tenant.findById(id);
+    if (!tenant) {
+      return res.status(404).json({ success: false, message: "ভাড়াটিয়া খুঁজে পাওয়া যায়নি!" });
+    }
+
+    if (String(tenant.owner) !== ownerId) {
+      return res.status(403).json({ success: false, message: "আপনার এই অপারেশনের অনুমতি নেই!" });
+    }
+
+    tenant.leaseEnd = new Date(newEndDate);
+    await tenant.save();
+
+    res.status(200).json({
+      success: true,
+      message: "লিজ সফলভাবে রিনিউ করা হয়েছে!",
+      leaseEnd: tenant.leaseEnd
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
