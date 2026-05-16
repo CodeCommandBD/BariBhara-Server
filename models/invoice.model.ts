@@ -73,6 +73,10 @@ const invoiceSchema = new mongoose.Schema({
   dueDate: {
     type: Date,
   },
+  pdfUrl: {
+    type: String,
+    default: "",
+  },
   createdAt: {
     type: Date,
     default: Date.now,
