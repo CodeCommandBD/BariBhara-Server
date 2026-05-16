@@ -8,7 +8,10 @@ import {
   updateTenant,
   vacateTenant,
   toggleAutoRenew,
-  renewLease
+  renewLease,
+  generateAgreement,
+  signAgreement,
+  deleteAgreement
 } from "../controller/tenant.controller.js";
 
 const tenantRouter = express.Router();
@@ -33,5 +36,10 @@ tenantRouter.patch("/:id/auto-renew", isAuthenticated, toggleAutoRenew);
 
 // Manual renew
 tenantRouter.post("/:id/renew-lease", isAuthenticated, renewLease);
+
+// ডিজিটাল চুক্তিপত্র (Digital Agreement)
+tenantRouter.post("/:id/generate-agreement", isAuthenticated, generateAgreement);
+tenantRouter.post("/sign-agreement", isAuthenticated, signAgreement);
+tenantRouter.delete("/:id/agreement", isAuthenticated, deleteAgreement);
 
 export default tenantRouter;

@@ -3,6 +3,9 @@ import mongoose from "mongoose";
 import Tenant from "../models/tenant.model.js";
 import Unit from "../models/unit.model.js";
 import Property from "../models/property.model.js";
+import User from "../models/user.model.js";
+import { generateAgreementPDF } from "../services/agreement.service.js";
+import cloudinary from "cloudinary";
 
 // ১. নতুন ভাড়াটিয়া যোগ করা (Assign Tenant to a Unit)
 export const addTenant = async (req: Req, res: Res) => {
@@ -284,6 +287,111 @@ export const renewLease = async (req: Req, res: Res) => {
       message: "লিজ সফলভাবে রিনিউ করা হয়েছে!",
       leaseEnd: tenant.leaseEnd
     });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ... existing code ...
+
+// ৮. চুক্তিপত্র জেনারেট করা
+export const generateAgreement = async (req: Req, res: Res) => {
+  try {
+    const id = req.params.id as string;
+    const ownerId = (req as any).user.id as string;
+
+    const tenant = await Tenant.findById(id)
+      .populate("unit", "unitName")
+      .populate("property", "name")
+      .populate("owner", "fullName");
+
+    if (!tenant) {
+      return res.status(404).json({ success: false, message: "ভাড়াটিয়া খুঁজে পাওয়া যায়নি!" });
+    }
+
+    if (String(tenant.owner._id) !== ownerId) {
+      return res.status(403).json({ success: false, message: "অনুমতি নেই!" });
+    }
+
+    const user = await User.findById(ownerId);
+
+    const pdfUrl = await generateAgreementPDF({
+      tenantName: tenant.name,
+      propertyName: (tenant.property as any)?.name ?? "N/A",
+      unitName: (tenant.unit as any)?.unitName ?? "N/A",
+      rentAmount: tenant.rentAmount,
+      startDate: tenant.leaseStart,
+      endDate: tenant.leaseEnd || "Auto-renew",
+      landlordName: user?.fullName ?? "মালিক",
+    }, user?.agreementTemplate || "");
+
+    tenant.agreement = {
+      ...(tenant.agreement || {}),
+      pdfUrl: pdfUrl,
+      isSigned: false,
+    };
+    await tenant.save();
+
+    res.status(200).json({ success: true, message: "চুক্তিপত্র সফলভাবে জেনারেট হয়েছে!", pdfUrl });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ৯. ভাড়াটিয়া কর্তৃক স্বাক্ষর করা (Sign Agreement)
+export const signAgreement = async (req: Req, res: Res) => {
+  try {
+    const tenantId = (req as any).user.id as string; // Tenant portal login
+    const { signatureData } = req.body; // base64 image
+
+    if (!signatureData) {
+      return res.status(400).json({ success: false, message: "স্বাক্ষর প্রয়োজন!" });
+    }
+
+    const tenant = await Tenant.findById(tenantId);
+    if (!tenant) {
+      return res.status(404).json({ success: false, message: "ভাড়াটিয়া খুঁজে পাওয়া যায়নি!" });
+    }
+
+    if (!tenant.agreement?.pdfUrl) {
+      return res.status(400).json({ success: false, message: "আগে চুক্তিপত্র জেনারেট করতে হবে!" });
+    }
+
+    // Upload signature to cloudinary
+    const result = await cloudinary.v2.uploader.upload(signatureData, {
+      folder: "signatures",
+    });
+
+    tenant.agreement = {
+      ...(tenant.agreement || {}),
+      signatureUrl: result.secure_url,
+      isSigned: true,
+      signedAt: new Date(),
+    };
+    await tenant.save();
+
+    res.status(200).json({ success: true, message: "চুক্তিপত্র সফলভাবে স্বাক্ষরিত হয়েছে!" });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ১০. চুক্তিপত্র মুছে ফেলা (Delete Agreement)
+export const deleteAgreement = async (req: Req, res: Res) => {
+  try {
+    const { id } = req.params;
+    const tenant = await Tenant.findById(id);
+    if (!tenant) return res.status(404).json({ success: false, message: "ভাড়াটিয়া পাওয়া যায়নি!" });
+
+    tenant.agreement = {
+      pdfUrl: null,
+      signatureUrl: null,
+      isSigned: false,
+      signedAt: null,
+    };
+    await tenant.save();
+
+    res.status(200).json({ success: true, message: "চুক্তিপত্র সফলভাবে মুছে ফেলা হয়েছে!" });
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });
   }

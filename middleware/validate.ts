@@ -14,6 +14,7 @@ export const registerSchema = z.object({
 export const loginSchema = z.object({
   email: z.string().email("সঠিক ইমেইল দিন"),
   password: z.string().min(1, "পাসওয়ার্ড দিন"),
+  deviceId: z.string().optional(),
 });
 
 // ============================

@@ -1,6 +1,7 @@
 import type { Request as Req, Response as Res } from "express";
 import mongoose from "mongoose";
 import Maintenance from "../models/maintenance.model.js";
+import { sendNotification } from "../services/socket.service.js";
 
 // ১. সব মেইনটেন্যান্স রিকোয়েস্ট লিস্ট
 export const getAllMaintenance = async (req: Req, res: Res) => {
@@ -82,6 +83,17 @@ export const updateMaintenanceStatus = async (req: Req, res: Res) => {
     if (cost !== undefined) item.cost = cost;
     if (status === "Resolved") item.resolvedDate = new Date();
     await item.save();
+
+    // ভাড়াটিয়াকে নোটিফিকেশন পাঠানো
+    if (item.tenant) {
+      await sendNotification({
+        recipient: String(item.tenant),
+        type: "maintenance",
+        title: "মেইনটেন্যান্স আপডেট 🛠️",
+        message: `আপনার অনুরোধ "${item.title}" এখন "${status}" অবস্থায় আছে।`,
+        link: "/tenant/maintenance",
+      });
+    }
 
     res.status(200).json({ success: true, message: "স্ট্যাটাস আপডেট হয়েছে!", item });
   } catch (error: any) {
