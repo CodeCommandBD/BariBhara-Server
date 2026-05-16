@@ -1,6 +1,7 @@
 import type { Request as Req, Response as Res } from "express";
 import User from "../models/user.model.js";
 import nodemailer from "nodemailer";
+import jwt from "jsonwebtoken";
 
 // In-memory OTP store: { userId: { otp, expiresAt } }
 const otpStore = new Map<string, { otp: string; expiresAt: number }>();
@@ -105,7 +106,25 @@ export const verifyLoginOTP = async (req: Req, res: Res) => {
     const user = await User.findById(userId);
     if (!user) return res.status(404).json({ success: false, message: "ইউজার পাওয়া যায়নি" });
 
-    const jwt = require("jsonwebtoken");
+    // ডিভাইসটিকে ট্রাস্টেড হিসেবে সেভ করা এবং রোলের বানান ঠিক করা
+    const { deviceId } = req.body;
+    console.log("Saving Device ID:", deviceId); // ডিবাগিং এর জন্য
+
+    if (deviceId) {
+      // সরাসরি $addToSet ব্যবহার করা ভালো কারণ এটি ডুপ্লিকেট রোধ করে
+      await User.findByIdAndUpdate(userId, { 
+        $addToSet: { trustedDevices: deviceId },
+        role: (user.role as string) === "landload" ? "landlord" : user.role
+      });
+      
+      // ৫টির বেশি ডিভাইস হলে পুরনোটি বাদ দেওয়া (ঐচ্ছিক কিন্তু ভালো)
+      const updatedUser = await User.findById(userId);
+      if (updatedUser && updatedUser.trustedDevices.length > 5) {
+        await User.findByIdAndUpdate(userId, { $pop: { trustedDevices: -1 } });
+      }
+    }
+
+
     const token = jwt.sign(
       { id: user._id, user: user.fullName },
       process.env.SECRET_KEY as string,
