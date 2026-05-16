@@ -5,6 +5,7 @@ import Unit from "../models/unit.model.js";
 import Invoice from "../models/invoice.model.js";
 import Transaction from "../models/transaction.model.js";
 import Tenant from "../models/tenant.model.js";
+import Maintenance from "../models/maintenance.model.js";
 import { cache, CACHE_TTL } from "../services/cache.service.js";
 
 // ১. মেইন ড্যাশবোর্ড স্ট্যাটস (Property, Unit, Revenue, Occupancy)
@@ -30,6 +31,7 @@ export const getLandlordStats = async (req: Req, res: Res) => {
       rentedUnits,
       monthlyRevenueData,
       totalDueData,
+      pendingMaintenance,
     ] = await Promise.all([
       Property.countDocuments({ owner: ownerObjectId }),
       Unit.countDocuments({ property: { $in: propertyIds } }),
@@ -48,6 +50,7 @@ export const getLandlordStats = async (req: Req, res: Res) => {
         { $match: { owner: ownerObjectId, status: { $ne: "Paid" } } },
         { $group: { _id: null, totalDue: { $sum: "$dueAmount" } } },
       ]),
+      Maintenance.countDocuments({ owner: ownerObjectId, status: "Pending" }),
     ]);
 
     const availableUnits = totalUnits - rentedUnits;
@@ -65,6 +68,7 @@ export const getLandlordStats = async (req: Req, res: Res) => {
         totalRevenue,
         totalDue,
         occupancyRate,
+        pendingMaintenance,
       },
     };
 
