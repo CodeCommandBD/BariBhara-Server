@@ -9,7 +9,16 @@ import User from "../models/user.model.js";
 import { clearDashboardCache } from "./dashboard.controller.js";
 import { generateInvoicePDF, generateInvoiceNumber } from "../services/pdf.service.js";
 import { sendPaymentReceiptEmail } from "../services/email.service.js";
-import { emitNotification } from "../services/socket.service.js";
+import { sendNotification } from "../services/socket.service.js";
+import { whatsappService } from "../services/whatsapp.service.js";
+import { v2 as cloudinary } from "cloudinary";
+
+// ক্লাউডিনারি কনফিগারেশন (যদি দরকার হয়, অন্যথায় অটোমেটিক ডট এনভ থেকে নিবে)
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
 // ১. নতুন ইনভয়েস/বিল তৈরি করা (Manual Generate)
 export const generateInvoice = async (req: Req, res: Res) => {
@@ -72,6 +81,12 @@ export const generateInvoice = async (req: Req, res: Res) => {
     });
 
     await newInvoice.save();
+
+    // WhatsApp Notification
+    if (tenant.phone) {
+      const message = `সালাম ${tenant.name},\nআপনার ${month} ${year} মাসের বিল তৈরি করা হয়েছে।\nমোট পরিমাণ: ${totalAmount} BDT\nশেষ তারিখ: ${dueDate ? new Date(dueDate).toLocaleDateString('bn-BD') : 'N/A'}\nধন্যবাদ।`;
+      whatsappService.sendMessage(tenant.phone, message);
+    }
 
     res.status(201).json({
       success: true,
@@ -140,18 +155,22 @@ export const collectPayment = async (req: Req, res: Res) => {
     // Dashboard cache clear
     clearDashboardCache(ownerId);
 
-    // ১️⃣ Real-time Notification emit
-    await emitNotification({
-      recipientId: ownerId,
-      type: "payment_received",
+    // ১️⃣ Real-time Notification
+    await sendNotification({
+      recipient: ownerId,
+      type: "payment",
       title: "পেমেন্ট গৃহীত হয়েছে! ✅",
-      message: `${(invoice.tenant as any)?.name} থেকে তক ${paymentAmount.toLocaleString()} গ্রহণ হয়েছে — ${invoice.month} ${invoice.year}`,
-      meta: {
-        invoiceId: String(invoice._id),
-        tenantId: String((invoice.tenant as any)?._id ?? ""),
-        amount: paymentAmount,
-        url: "/payments",
-      },
+      message: `${(invoice.tenant as any)?.name} থেকে ${paymentAmount.toLocaleString()} টাকা গ্রহণ করা হয়েছে — ${invoice.month} ${invoice.year}`,
+      link: "/payments",
+    });
+
+    // ২️⃣ ভাড়াটিয়াকে নোটিফিকেশন পাঠানো
+    await sendNotification({
+      recipient: String((invoice.tenant as any)?._id),
+      type: "payment",
+      title: "পেমেন্ট কনফার্মেশন 💰",
+      message: `আপনার ${invoice.month} মাসের ${paymentAmount.toLocaleString()} টাকা পেমেন্ট সফলভাবে গ্রহণ করা হয়েছে।`,
+      link: "/tenant/invoices",
     });
 
     // ====================================================
@@ -193,6 +212,27 @@ export const collectPayment = async (req: Req, res: Res) => {
             status: (newDueAmount <= 0 ? "Paid" : "Partial") as "Paid" | "Partial",
           });
 
+          // Cloudinary তে আপলোড
+          const uploadPromise = new Promise((resolve, reject) => {
+            const stream = cloudinary.uploader.upload_stream(
+              {
+                resource_type: "raw",
+                folder: "invoices",
+                public_id: `${invoiceNumber}`,
+              },
+              (error, result) => {
+                if (error) reject(error);
+                else resolve(result?.secure_url);
+              }
+            );
+            stream.end(pdfBuffer);
+          });
+
+          const cloudinaryUrl = await uploadPromise;
+
+          // ইনভয়েস এ PDF URL সেভ করা
+          await Invoice.findByIdAndUpdate(invoiceId, { pdfUrl: cloudinaryUrl });
+
           await sendPaymentReceiptEmail({
             tenantEmail: tenant.email,
             tenantName: tenant.name,
@@ -208,10 +248,22 @@ export const collectPayment = async (req: Req, res: Res) => {
             pdfBuffer,
             invoiceNumber,
           });
+
+          // WhatsApp এও PDF লিঙ্ক পাঠানো (যদি সম্ভব হয়)
+          if (tenant?.phone && cloudinaryUrl) {
+            const msg = `আপনার ${invoice.month} মাসের ইনভয়েস ডাউনলোড লিঙ্ক: ${cloudinaryUrl}`;
+            whatsappService.sendMessage(tenant.phone, msg);
+          }
         } catch (emailErr) {
-          console.error("PDF/Email Error:", emailErr);
+          console.error("PDF/Email/Cloudinary Error:", emailErr);
         }
       })();
+    }
+
+    // WhatsApp Notification
+    if (tenant?.phone) {
+      const message = `সালাম ${tenant.name},\nআপনার ${invoice.month} ${invoice.year} মাসের পেমেন্ট সফলভাবে গৃহীত হয়েছে।\nপরিমাণ: ${paymentAmount} BDT\nঅবশিষ্ট বকেয়া: ${Math.max(0, newDueAmount)} BDT\nধন্যবাদ।`;
+      whatsappService.sendMessage(tenant.phone, message);
     }
 
     res.status(200).json({

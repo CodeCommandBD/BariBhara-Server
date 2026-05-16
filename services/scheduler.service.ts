@@ -1,5 +1,6 @@
 import cron from "node-cron";
 import Tenant from "../models/tenant.model.js";
+import Invoice from "../models/invoice.model.js";
 import nodemailer from "nodemailer";
 
 // Email transporter
@@ -85,4 +86,37 @@ export const startScheduler = () => {
   });
 
   console.log("✅ Lease auto-renewal scheduler started (runs daily at midnight).");
+
+  // --- ২. অটো-ইনভয়েস জেনারেটর ---
+  // প্রতি মাসের ১ তারিখ রাত ১২:০০ মিনিটে চলে (0 0 1 * *)
+  cron.schedule("0 0 1 * *", async () => {
+    console.log("🚀 Running Auto-Invoice Generation...");
+    try {
+      const activeTenants = await Tenant.find({ status: "সক্রিয়" });
+      const currentMonth = new Date().toLocaleString("en-us", { month: "long" });
+      const currentYear = new Date().getFullYear();
+
+      for (const tenant of activeTenants) {
+        const existing = await Invoice.findOne({ tenant: tenant._id, month: currentMonth, year: currentYear });
+        if (!existing) {
+          await Invoice.create({
+            tenant: tenant._id,
+            unit: tenant.unit,
+            property: tenant.property,
+            owner: tenant.owner,
+            month: currentMonth,
+            year: currentYear,
+            baseRent: tenant.rentAmount,
+            totalAmount: tenant.rentAmount,
+            dueAmount: tenant.rentAmount,
+            status: "Unpaid",
+            dueDate: new Date(currentYear, new Date().getMonth(), 10),
+          });
+        }
+      }
+      console.log("✅ Auto-Invoice generation complete.");
+    } catch (err) {
+      console.error("❌ Auto-Invoice error:", err);
+    }
+  }, { timezone: "Asia/Dhaka" });
 };

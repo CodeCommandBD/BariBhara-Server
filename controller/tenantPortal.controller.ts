@@ -4,6 +4,7 @@ import Tenant from "../models/tenant.model.js";
 import Invoice from "../models/invoice.model.js";
 import Maintenance from "../models/maintenance.model.js";
 import { generateInvoicePDF, generateInvoiceNumber } from "../services/pdf.service.js";
+import { sendNotification } from "../services/socket.service.js";
 
 const JWT_SECRET = process.env.JWT_SECRET || "your_jwt_secret";
 const JWT_EXPIRES = "7d";
@@ -205,7 +206,17 @@ export const tenantCreateMaintenance = async (req: Req, res: Res) => {
       status: "Pending",
       property: tenant.property,
       unit: tenant.unit,
+      tenant: tenantId,
       owner: tenant.owner,
+    });
+
+    // বাড়িওয়ালাকে নোটিফিকেশন পাঠানো
+    await sendNotification({
+      recipient: String(tenant.owner),
+      type: "maintenance",
+      title: "নতুন মেইনটেন্যান্স রিকোয়েস্ট! 🛠️",
+      message: `${tenant.name} থেকে একটি নতুন অনুরোধ এসেছে: "${title}"`,
+      link: "/maintenance",
     });
 
     res.status(201).json({ success: true, message: "অনুরোধ পাঠানো হয়েছে!", maintenance });

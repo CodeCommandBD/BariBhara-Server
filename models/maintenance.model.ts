@@ -5,6 +5,7 @@ export interface IMaintenance extends Document {
   description: string;
   property: mongoose.Types.ObjectId;
   unit?: mongoose.Types.ObjectId;
+  tenant?: mongoose.Types.ObjectId;
   status: "Pending" | "In Progress" | "Resolved";
   priority: "Low" | "Medium" | "High";
   reportedDate: Date;
@@ -19,6 +20,7 @@ const maintenanceSchema = new Schema<IMaintenance>(
     description: { type: String, trim: true, default: "" },
     property: { type: Schema.Types.ObjectId, ref: "Property", required: true },
     unit: { type: Schema.Types.ObjectId, ref: "Unit" },
+    tenant: { type: Schema.Types.ObjectId, ref: "Tenant" },
     status: {
       type: String,
       enum: ["Pending", "In Progress", "Resolved"],

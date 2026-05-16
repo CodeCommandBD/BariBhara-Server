@@ -15,7 +15,7 @@ export const generalLimiter = rateLimit({
 // ২. Auth লিমিট — প্রতি ১৫ মিনিটে মাত্র ১০ বার লগিন/রেজিস্ট্রেশন
 export const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 10,
+  max: 50,
   standardHeaders: true,
   legacyHeaders: false,
   message: {

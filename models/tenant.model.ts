@@ -28,7 +28,7 @@ const tenantSchema = new mongoose.Schema(
     },
     phone: {
       type: String,
-      required: [true, "ফোন নম্বর আবশ্যক"],
+      required: [true, "সঠিক WhatsApp নম্বর দেওয়া আবশ্যক"],
       trim: true,
     },
     email: {
@@ -95,6 +95,14 @@ const tenantSchema = new mongoose.Schema(
         uploadedAt: { type: Date, default: Date.now },
       },
     ],
+
+    // ৮. ডিজিটাল চুক্তি (Digital Agreement)
+    agreement: {
+      pdfUrl: { type: String, default: null },
+      signatureUrl: { type: String, default: null },
+      isSigned: { type: Boolean, default: false },
+      signedAt: { type: Date, default: null },
+    },
 
     // ৭. স্ট্যাটাস (Status)
     status: {
