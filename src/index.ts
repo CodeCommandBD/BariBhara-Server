@@ -2,7 +2,7 @@ import "dotenv/config";
 import { createServer } from "http";
 import app from "./app.js";
 import { initSocket } from "../services/socket.service.js";
-import { startCronJobs } from "../services/cron.service.js";
+import { whatsappService } from "../services/whatsapp.service.js";
 
 const PORT = process.env.PORT || 4000;
 
@@ -10,12 +10,13 @@ const PORT = process.env.PORT || 4000;
 const httpServer = createServer(app);
 
 // ২. Socket.io initialize করা
-initSocket(httpServer);
+const io = initSocket(httpServer);
 
-// ৩. HTTP Server চালু করা
+// ৩. WhatsApp Service initialize করা
+whatsappService.init(io).catch((err) => console.error("WhatsApp Init Error:", err));
+
+// ৪. HTTP Server চালু করা
 httpServer.listen(PORT, () => {
   console.log(`🚀 Server running → http://localhost:${PORT}`);
   console.log(`🔌 Socket.io ready`);
-  // Cron jobs শুরু করা
-  startCronJobs();
 });

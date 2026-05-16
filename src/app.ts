@@ -15,7 +15,6 @@ import tenantRouter from "../routes/tenant.routes.js";
 import rentRouter from "../routes/rent.routes.js";
 import expenseRouter from "../routes/expense.routes.js";
 import reportsRouter from "../routes/reports.routes.js";
-import notificationRouter from "../routes/notification.routes.js";
 import profileRouter from "../routes/profile.routes.js";
 import maintenanceRouter from "../routes/maintenance.routes.js";
 import searchRouter from "../routes/search.routes.js";
@@ -24,6 +23,7 @@ import tenantPortalRouter from "../routes/tenantPortal.routes.js";
 import bulkRouter from "../routes/bulk.routes.js";
 import documentRouter from "../routes/document.routes.js";
 import twofaRouter from "../routes/twofa.routes.js";
+import whatsappRouter from "../routes/whatsapp.routes.js";
 import { startScheduler } from "../services/scheduler.service.js";
 
 // Middleware
@@ -101,10 +101,7 @@ app.use("/api/expense", expenseRouter);
 // ৮. রিপোর্ট
 app.use("/api/reports", reportsRouter);
 
-// ৯. নোটিফিকেশন ও PDF
-app.use("/api/notification", notificationRouter);
-
-// ১০. প্রোফাইল ও সেটিংস
+// ৯. প্রোফাইল ও সেটিংস
 app.use("/api/profile", profileRouter);
 
 // ১১. মেইনটেন্যান্স ট্র্যাকিং
@@ -125,10 +122,29 @@ app.use("/api/bulk", bulkRouter);
 // ১৬. Document Management
 app.use("/api/documents", documentRouter);
 
-// ১৭. Two-Factor Authentication
-app.use("/api/2fa", twofaRouter);
+// ১৭. Two-Factor Authentication — বিশেষ কঠোর রেট লিমিট
+app.use("/api/2fa", authLimiter, twofaRouter);
 
-// ১৮. Start Scheduler (Lease Auto-renewal)
+// NoSQL Injection Protection (কাস্টম মিডলওয়্যার)
+app.use((req, res, next) => {
+  const sanitize = (obj: any) => {
+    if (obj instanceof Object) {
+      for (const key in obj) {
+        if (key.startsWith("$")) delete obj[key];
+        else sanitize(obj[key]);
+      }
+    }
+  };
+  sanitize(req.body);
+  sanitize(req.query);
+  sanitize(req.params);
+  next();
+});
+
+// ১৮. WhatsApp Bot Integration
+app.use("/api/whatsapp", whatsappRouter);
+
+// ১৯. Start Scheduler (Lease Auto-renewal)
 startScheduler();
 
 // ==========================================
