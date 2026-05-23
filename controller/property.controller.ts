@@ -2,12 +2,38 @@ import type { Request as Req, Response as Res } from "express";
 import mongoose from "mongoose";
 import Property from "../models/property.model.js";
 import Unit from "../models/unit.model.js";
+import User from "../models/user.model.js";
 
 
 // ১. নতুন বাড়ি তৈরি করা (Create Property)
 
 export const createProperty = async (req: Req, res: Res) => {
   try {
+    const ownerId = (req as any).user.id;
+
+    // ১. ইউজার সাবস্ক্রিপশন ও লিমিট সিকিউরিটি চেক
+    const user = await User.findById(ownerId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: "ইউজার খুঁজে পাওয়া যায়নি!" });
+    }
+
+    if (user.role === "landlord" && user.subscriptionStatus !== "active") {
+      return res.status(403).json({
+        success: false,
+        message: "আপনার ড্যাশবোর্ডটি বর্তমানে লকড রয়েছে! নতুন প্রপার্টি যুক্ত করতে দয়া করে আগে সাবস্ক্রাইব করুন।",
+      });
+    }
+
+    if (user.role === "landlord" && user.subscriptionPlan === "free") {
+      const propertyCount = await Property.countDocuments({ owner: ownerId });
+      if (propertyCount >= 1) {
+        return res.status(403).json({
+          success: false,
+          message: "আপনার ফ্রি প্ল্যানের লিমিট শেষ! আরও বিল্ডিং যোগ করতে দয়া করে প্রো প্ল্যানে আপগ্রেড করুন।",
+        });
+      }
+    }
+
     // req.body থেকে ডেটা নেওয়া
     const { name, location, totalFloors } = req.body;
 
@@ -23,7 +49,7 @@ export const createProperty = async (req: Req, res: Res) => {
       location,
       totalFloors,
       images: imageUrls,
-      owner: (req as any).user.id, // যদি ইউজার লগইন করা থাকে
+      owner: ownerId, // যদি ইউজার লগইন করা থাকে
     });
 
     // প্রপার্টি সেভ করা

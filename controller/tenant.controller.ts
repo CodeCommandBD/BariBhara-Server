@@ -11,6 +11,30 @@ import cloudinary from "cloudinary";
 export const addTenant = async (req: Req, res: Res) => {
   try {
     const ownerId = (req as any).user.id as string;
+
+    // ১. ইউজার সাবস্ক্রিপশন ও লিমিট সিকিউরিটি চেক
+    const user = await User.findById(ownerId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: "ইউজার খুঁজে পাওয়া যায়নি!" });
+    }
+
+    if (user.role === "landlord" && user.subscriptionStatus !== "active") {
+      return res.status(403).json({
+        success: false,
+        message: "আপনার ড্যাশবোর্ডটি বর্তমানে লকড রয়েছে! নতুন ভাড়াটিয়া যুক্ত করতে দয়া করে আগে সাবস্ক্রাইব করুন।",
+      });
+    }
+
+    if (user.role === "landlord" && user.subscriptionPlan === "free") {
+      const tenantCount = await Tenant.countDocuments({ owner: ownerId, status: "সক্রিয়" });
+      if (tenantCount >= 2) {
+        return res.status(403).json({
+          success: false,
+          message: "আপনার ফ্রি প্ল্যানের লিমিট শেষ! আরও ভাড়াটিয়া ম্যানেজ করতে দয়া করে প্রো প্ল্যানে আপগ্রেড করুন।",
+        });
+      }
+    }
+
     const files = req.files as Express.Multer.File[] | undefined;
     const photoUrl = files?.[0]?.path?.replace(/\\/g, "/") ?? "";
 

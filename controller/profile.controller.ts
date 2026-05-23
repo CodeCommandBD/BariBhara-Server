@@ -19,6 +19,15 @@ export const getProfile = async (req: Req, res: Res) => {
     const userId = (req as any).user.id as string;
     const user = await User.findById(userId).select("-password");
     if (!user) return res.status(404).json({ success: false, message: "ইউজার পাওয়া যায়নি!" });
+
+    // Check and update subscription expiration
+    if (user.role === "landlord" && user.subscriptionStatus === "active" && user.subscriptionExpiresAt) {
+      if (new Date() > new Date(user.subscriptionExpiresAt)) {
+        user.subscriptionStatus = "expired";
+        await user.save();
+      }
+    }
+
     res.status(200).json({ success: true, user });
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });
