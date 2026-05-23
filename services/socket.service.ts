@@ -56,3 +56,18 @@ export const sendNotification = async (data: {
     console.error("❌ Socket Notification Error:", error);
   }
 };
+
+/**
+ * রিয়েল-টাইম সাবস্ক্রিপশন আপডেট নোটিফাই করার ফাংশন
+ */
+export const notifySubscriptionUpdate = (userId: string, status: string, plan: string) => {
+  try {
+    const socketId = userSockets.get(userId);
+    if (socketId && io) {
+      io.to(socketId).emit("subscription_status_updated", { status, plan });
+      console.log(`🔌 Sent subscription_status_updated to user ${userId} -> ${status}`);
+    }
+  } catch (error) {
+    console.error("❌ Socket Subscription Update Error:", error);
+  }
+};
