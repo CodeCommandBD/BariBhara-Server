@@ -2,9 +2,9 @@ name: 🚀 Server CI/CD
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main, develop, development]
   pull_request:
-    branches: [main]
+    branches: [main, development]
 
 jobs:
   # ===========================
