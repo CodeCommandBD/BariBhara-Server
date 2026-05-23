@@ -22,8 +22,27 @@ const userSchema = new mongoose.Schema({
     role: {
         type: String,
         required: true,
-        enum: ["tenant", "landlord"],
+        enum: ["tenant", "landlord", "admin"],
         default: "tenant"
+    },
+    accountStatus: {
+        type: String,
+        enum: ["active", "blocked"],
+        default: "active"
+    },
+    subscriptionPlan: {
+        type: String,
+        enum: ["free", "basic", "pro"],
+        default: "free"
+    },
+    subscriptionStatus: {
+        type: String,
+        enum: ["active", "pending", "expired", "none"],
+        default: "none"
+    },
+    subscriptionExpiresAt: {
+        type: Date,
+        default: null
     },
     photo: {
         type: String,

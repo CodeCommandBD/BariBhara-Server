@@ -1,9 +1,9 @@
 import rateLimit from "express-rate-limit";
 
-// ১. সাধারণ API লিমিট — প্রতি ১৫ মিনিটে ১০০ রিকোয়েস্ট
+// ১. সাধারণ API লিমিট — প্রতি ১৫ মিনিটে ৫০০০ রিকোয়েস্ট (ডেভেলপমেন্ট ও স্মুথ টেস্টিংয়ের জন্য বর্ধিত)
 export const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // ১৫ মিনিট
-  max: 100,
+  max: 5000,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
@@ -12,10 +12,10 @@ export const generalLimiter = rateLimit({
   },
 });
 
-// ২. Auth লিমিট — প্রতি ১৫ মিনিটে মাত্র ১০ বার লগিন/রেজিস্ট্রেশন
+// ২. Auth লিমিট — প্রতি ১৫ মিনিটে মাত্র ১০০ বার লগিন/রেজিস্ট্রেশন
 export const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 50,
+  max: 100,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
@@ -24,10 +24,10 @@ export const authLimiter = rateLimit({
   },
 });
 
-// ৩. ফাইল আপলোড লিমিট — প্রতি ঘণ্টায় ২০টি আপলোড
+// ৩. ফাইল আপলোড লিমিট — প্রতি ঘণ্টায় ১০০টি আপলোড
 export const uploadLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // ১ ঘণ্টা
-  max: 20,
+  max: 100,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
@@ -36,10 +36,10 @@ export const uploadLimiter = rateLimit({
   },
 });
 
-// ৪. সার্চ লিমিট — প্রতি মিনিটে ৩০টি সার্চ
+// ৪. সার্চ লিমিট — প্রতি মিনিটে ৩০০টি সার্চ
 export const searchLimiter = rateLimit({
   windowMs: 60 * 1000, // ১ মিনিট
-  max: 30,
+  max: 300,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
@@ -48,10 +48,10 @@ export const searchLimiter = rateLimit({
   },
 });
 
-// ৫. ড্যাশবোর্ড লিমিট — প্রতি মিনিটে ৩০টি (cache থাকায় এটি lightweight)
+// ৫. ড্যাশবোর্ড লিমিট — প্রতি মিনিটে ৫০০টি (ডেভেলপমেন্ট রিফ্রেশের জন্য বর্ধিত)
 export const dashboardLimiter = rateLimit({
   windowMs: 60 * 1000, // ১ মিনিট
-  max: 30,
+  max: 500,
   standardHeaders: true,
   legacyHeaders: false,
   message: {

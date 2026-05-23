@@ -24,7 +24,10 @@ import bulkRouter from "../routes/bulk.routes.js";
 import documentRouter from "../routes/document.routes.js";
 import twofaRouter from "../routes/twofa.routes.js";
 import whatsappRouter from "../routes/whatsapp.routes.js";
+import subscriptionRouter from "../routes/subscription.routes.js";
+import adminRouter from "../routes/admin.routes.js";
 import { startScheduler } from "../services/scheduler.service.js";
+import { seedAdmin } from "../services/seedAdmin.js";
 
 // Middleware
 import { generalLimiter, authLimiter, searchLimiter } from "../middleware/rateLimiter.js";
@@ -144,8 +147,17 @@ app.use((req, res, next) => {
 // ১৮. WhatsApp Bot Integration
 app.use("/api/whatsapp", whatsappRouter);
 
-// ১৯. Start Scheduler (Lease Auto-renewal)
+// ১৯. Subscription & Payments
+app.use("/api/subscription", subscriptionRouter);
+
+// ২০. Admin Routes
+app.use("/api/admin", adminRouter);
+
+// ২১. Start Scheduler (Lease Auto-renewal)
 startScheduler();
+
+// ২২. Seed Default Admin
+seedAdmin();
 
 // ==========================================
 // Error Handlers
