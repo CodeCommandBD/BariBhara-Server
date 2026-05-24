@@ -84,9 +84,12 @@ jobs:
     steps:
       - name: 🚀 Trigger Render Deploy Hook
         run: |
-          curl -s -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}" \
-            -H "Content-Type: application/json" \
-            | python3 -c "import sys,json; d=json.load(sys.stdin); print('Deploy triggered:', d.get('id','unknown'))"
+          if [ -z "${{ secrets.RENDER_DEPLOY_HOOK_URL }}" ]; then
+            echo "⚠️ Warning: RENDER_DEPLOY_HOOK_URL is not set. Skipping deployment hook."
+            exit 0
+          fi
+          RESPONSE=$(curl -s -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}" -H "Content-Type: application/json")
+          echo "🚀 Render Webhook response: $RESPONSE"
 
       - name: ⏳ Wait for Deployment (90s)
         run: sleep 90
