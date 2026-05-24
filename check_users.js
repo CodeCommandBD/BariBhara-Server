@@ -3,7 +3,11 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-const MONGODB_URL = process.env.MONGODB_URL || "mongodb+srv://shantokumar:uDDmacohoojOT4XZrM814yzYRKEIAdzjGPrYc4XQ15upRVA6@cluster0.on3ofu5.mongodb.net/?appName=Bari-Bhara";
+const MONGODB_URL = process.env.MONGODB_URL;
+if (!MONGODB_URL) {
+  console.error("Error: MONGODB_URL is not set in environment variables!");
+  process.exit(1);
+}
 
 const userSchema = new mongoose.Schema({
   fullName: String,
