@@ -1,6 +1,6 @@
 import express from "express";
 import { isAuthenticated } from "../middleware/isAuthenticated.js";
-import { getProfile, updateProfile, updateProfilePhoto, changePassword } from "../controller/profile.controller.js";
+import { getProfile, updateProfile, updateProfilePhoto, changePassword, requestVerification, simulateToggleVerification } from "../controller/profile.controller.js";
 import multer from "multer";
 import { validate } from "../middleware/validationMiddleware.js";
 import { updateProfileSchema, changePasswordSchema } from "../middleware/validate.js";
@@ -26,5 +26,11 @@ profileRouter.patch("/photo", isAuthenticated, uploadLimiter, upload.single("pho
 
 // ৪. পাসওয়ার্ড পরিবর্তন — ভ্যালিডেশন সহ
 profileRouter.patch("/password", isAuthenticated, validate(changePasswordSchema), changePassword);
+
+// ৫. প্রোফাইল ভেরিফিকেশন অনুরোধ পাঠানো
+profileRouter.post("/request-verification", isAuthenticated, requestVerification);
+
+// ৬. প্রোফাইল ভেরিফিকেশন সিমুলেশন (সরাসরি টগল)
+profileRouter.post("/simulate-toggle-verification", isAuthenticated, simulateToggleVerification);
 
 export default profileRouter;
