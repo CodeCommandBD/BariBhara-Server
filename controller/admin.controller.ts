@@ -115,3 +115,34 @@ export const updateUserStatus = async (req: Request, res: Response): Promise<voi
         res.status(500).json({ message: "Internal server error" });
     }
 };
+
+export const updateUserVerification = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { id } = req.params;
+        const { isVerified } = req.body;
+
+        if (!["unverified", "pending", "verified"].includes(isVerified)) {
+            res.status(400).json({ message: "Invalid verification status." });
+            return;
+        }
+
+        const user = await User.findById(id);
+        if (!user) {
+            res.status(404).json({ message: "User not found" });
+            return;
+        }
+
+        user.isVerified = isVerified;
+        await user.save();
+
+        res.status(200).json({ 
+            success: true, 
+            message: isVerified === "verified" 
+                ? "বাড়িওয়ালার প্রোফাইল সফলভাবে ভেরিফাই করা হয়েছে!" 
+                : "বাড়িওয়ালার ভেরিফিকেশন বাতিল করা হয়েছে।" 
+        });
+    } catch (error) {
+        console.error("Error updating verification status:", error);
+        res.status(500).json({ message: "Internal server error" });
+    }
+};

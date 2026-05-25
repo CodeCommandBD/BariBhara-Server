@@ -125,3 +125,66 @@ export const changePassword = async (req: Req, res: Res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+// ৫. ভেরিফিকেশন অনুরোধ পাঠানো
+export const requestVerification = async (req: Req, res: Res) => {
+  try {
+    const userId = (req as any).user.id as string;
+    const { nidNumber, holdingNumber, message } = req.body;
+
+    if (!nidNumber || !holdingNumber) {
+      return res.status(400).json({ success: false, message: "এনআইডি (NID) নম্বর এবং হোল্ডিং নম্বর দেওয়া বাধ্যতামূলক!" });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ success: false, message: "ইউজার পাওয়া যায়নি!" });
+
+    if (user.isVerified === "verified") {
+      return res.status(400).json({ success: false, message: "আপনি ইতিমধ্যে ভেরিফাইড বাড়িওয়ালা!" });
+    }
+
+    user.isVerified = "pending";
+    user.verificationDetails = {
+      nidNumber,
+      holdingNumber,
+      message: message || "",
+      submittedAt: new Date()
+    };
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: "ভেরিফিকেশন অনুরোধ সফলভাবে পাঠানো হয়েছে! প্রশাসন শীঘ্রই এটি পর্যালোচনা করবে।",
+      user,
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ৬. ভেরিফিকেশন সিমুলেশন (ডেভেলপার টেস্টিংয়ের জন্য সরাসরি টগল)
+export const simulateToggleVerification = async (req: Req, res: Res) => {
+  try {
+    const userId = (req as any).user.id as string;
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ success: false, message: "ইউজার পাওয়া যায়নি!" });
+
+    // টগল লজিক: unverified/pending -> verified, verified -> unverified
+    if (user.isVerified === "verified") {
+      user.isVerified = "unverified";
+    } else {
+      user.isVerified = "verified";
+    }
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: user.isVerified === "verified" 
+        ? "অভিনন্দন! আপনার প্রোফাইল ভেরিফিকেশন সফলভাবে সম্পন্ন হয়েছে (সিমুলেশন)।" 
+        : "আপনার প্রোফাইল ভেরিফিকেশন বাতিল করা হয়েছে (সিমুলেশন)।",
+      user,
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};

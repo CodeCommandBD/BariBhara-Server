@@ -35,7 +35,20 @@ export const createProperty = async (req: Req, res: Res) => {
     }
 
     // req.body থেকে ডেটা নেওয়া
-    const { name, location, totalFloors } = req.body;
+    const {
+      name,
+      location,
+      totalFloors,
+      rent,
+      bedrooms,
+      bathrooms,
+      area,
+      description,
+      contactNumber,
+      googleMapUrl,
+      isPublic,
+      status
+    } = req.body;
 
     // ছবিগুলো সার্ভারে আপলোড হওয়ার পর তার লিঙ্কগুলো req.files-এ পাওয়া যাবে
     // req.files থেকে ছবি নেওয়া
@@ -50,6 +63,15 @@ export const createProperty = async (req: Req, res: Res) => {
       totalFloors,
       images: imageUrls,
       owner: ownerId, // যদি ইউজার লগইন করা থাকে
+      rent: rent ? Number(rent) : 0,
+      bedrooms: bedrooms ? Number(bedrooms) : 1,
+      bathrooms: bathrooms ? Number(bathrooms) : 1,
+      area: area ? Number(area) : 0,
+      description: description || "",
+      contactNumber: contactNumber || "",
+      googleMapUrl: googleMapUrl || "",
+      isPublic: isPublic === "true" || isPublic === true,
+      status: status || "available",
     });
 
     // প্রপার্টি সেভ করা
@@ -158,6 +180,14 @@ export const updateProperty = async (req: Req, res: Res) => {
     // ঘ. ডাটাবেস আপডেট করা
     const updateData = { ...req.body };
     delete updateData.existingImages; // এটি ডাটাবেসে সেভ করার দরকার নেই
+
+    if (updateData.isPublic !== undefined) {
+      updateData.isPublic = updateData.isPublic === "true" || updateData.isPublic === true;
+    }
+    if (updateData.rent !== undefined) updateData.rent = Number(updateData.rent);
+    if (updateData.bedrooms !== undefined) updateData.bedrooms = Number(updateData.bedrooms);
+    if (updateData.bathrooms !== undefined) updateData.bathrooms = Number(updateData.bathrooms);
+    if (updateData.area !== undefined) updateData.area = Number(updateData.area);
 
     const updatedProperty = await Property.findByIdAndUpdate(
       id,
