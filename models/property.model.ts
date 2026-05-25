@@ -27,6 +27,44 @@ const propertySchema = new mongoose.Schema({
       type: String,
     },
   ],
+  rent: {
+    type: Number,
+    default: 0,
+  },
+  bedrooms: {
+    type: Number,
+    default: 1,
+  },
+  bathrooms: {
+    type: Number,
+    default: 1,
+  },
+  area: {
+    type: Number,
+    default: 0, // square feet
+  },
+  description: {
+    type: String,
+    trim: true,
+  },
+  contactNumber: {
+    type: String,
+    trim: true,
+  },
+  googleMapUrl: {
+    type: String,
+    trim: true,
+    default: "",
+  },
+  isPublic: {
+    type: Boolean,
+    default: false,
+  },
+  status: {
+    type: String,
+    enum: ["available", "rented"],
+    default: "available",
+  },
   createdAt: {
     type: Date,
     default: Date.now,
