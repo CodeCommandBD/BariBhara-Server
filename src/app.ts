@@ -26,8 +26,10 @@ import twofaRouter from "../routes/twofa.routes.js";
 import whatsappRouter from "../routes/whatsapp.routes.js";
 import subscriptionRouter from "../routes/subscription.routes.js";
 import adminRouter from "../routes/admin.routes.js";
+import publicRouter from "../routes/public.routes.js";
 import { startScheduler } from "../services/scheduler.service.js";
 import { seedAdmin } from "../services/seedAdmin.js";
+import { seedPlans } from "../services/seedPlans.js";
 
 // Middleware
 import { generalLimiter, authLimiter, searchLimiter } from "../middleware/rateLimiter.js";
@@ -153,11 +155,15 @@ app.use("/api/subscription", subscriptionRouter);
 // ২০. Admin Routes
 app.use("/api/admin", adminRouter);
 
+// ২১. Public Routes
+app.use("/api/public", publicRouter);
+
 // ২১. Start Scheduler (Lease Auto-renewal)
 startScheduler();
 
 // ২২. Seed Default Admin
 seedAdmin();
+seedPlans();
 
 // ==========================================
 // Error Handlers
