@@ -56,6 +56,17 @@ const userSchema = new mongoose.Schema({
         type: Boolean,
         default: false
     },
+    isVerified: {
+        type: String,
+        enum: ["unverified", "pending", "verified"],
+        default: "unverified"
+    },
+    verificationDetails: {
+        nidNumber: { type: String, default: "" },
+        holdingNumber: { type: String, default: "" },
+        message: { type: String, default: "" },
+        submittedAt: { type: Date, default: null }
+    },
     trustedDevices: {
         type: [String],
         default: []
