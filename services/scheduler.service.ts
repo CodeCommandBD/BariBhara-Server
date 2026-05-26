@@ -1,7 +1,10 @@
 import cron from "node-cron";
 import Tenant from "../models/tenant.model.js";
 import Invoice from "../models/invoice.model.js";
+import User from "../models/user.model.js";
+import Property from "../models/property.model.js";
 import nodemailer from "nodemailer";
+import { sendRentReminderEmail } from "./email.service.js";
 
 // Email transporter
 const transporter = nodemailer.createTransport({
@@ -119,4 +122,98 @@ export const startScheduler = () => {
       console.error("❌ Auto-Invoice error:", err);
     }
   }, { timezone: "Asia/Dhaka" });
+
+  // --- ৩. রেন্ট ডিউ রিমাইন্ডার (প্রতিদিন সকাল ৯টায়) ---
+  cron.schedule("0 9 * * *", async () => {
+    console.log("📧 Running Rent Due Reminder scheduler...");
+    try {
+      const now = new Date();
+      const in3Days = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
+
+      // যে ইনভয়েসগুলো unpaid/partial এবং dueDate আছে
+      const invoices = await Invoice.find({
+        status: { $in: ["Unpaid", "Partial"] },
+        dueDate: { $exists: true, $ne: null },
+      })
+        .populate("tenant", "name email phone")
+        .populate("property", "name")
+        .populate("unit", "unitName")
+        .populate("owner", "email fullName");
+
+      let sent = 0;
+
+      for (const invoice of invoices) {
+        const tenant = invoice.tenant as any;
+        const property = invoice.property as any;
+        const unit = invoice.unit as any;
+        const owner = invoice.owner as any;
+        const dueDate = new Date(invoice.dueDate as Date);
+        const msLeft = dueDate.getTime() - now.getTime();
+        const daysLeft = Math.ceil(msLeft / (1000 * 60 * 60 * 24));
+
+        // Duplicate সেন্ড এড়াতে — ২৪ ঘণ্টার মধ্যে পাঠানো হয়েছে কিনা চেক
+        const lastReminder = (invoice as any).reminderSentAt;
+        const alreadySentRecently =
+          lastReminder &&
+          now.getTime() - new Date(lastReminder).getTime() < 23 * 60 * 60 * 1000;
+        if (alreadySentRecently) continue;
+
+        const shouldSend = daysLeft <= 3; // due in 3 days or overdue
+        if (!shouldSend) continue;
+
+        // ভাড়াটিয়াকে রিমাইন্ডার পাঠানো
+        if (tenant?.email) {
+          const isOverdue = daysLeft < 0;
+          await sendRentReminderEmail({
+            tenantEmail: tenant.email,
+            tenantName: tenant.name,
+            dueAmount: invoice.dueAmount,
+            propertyName: property?.name ?? "N/A",
+            unitName: unit?.unitName ?? "N/A",
+            month: invoice.month,
+            year: invoice.year,
+          });
+          sent++;
+        }
+
+        // বাড়িওয়ালাকে overdue alert (deadline পার হলে)
+        if (daysLeft < 0 && owner?.email) {
+          await (async () => {
+            const nodemailerTransport = nodemailer.createTransport({
+              service: "gmail",
+              auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
+            });
+            await nodemailerTransport.sendMail({
+              from: `"বাড়িভাড়া" <${process.env.EMAIL_USER}>`,
+              to: owner.email,
+              subject: `🔴 বকেয়া ভাড়া সতর্কতা — ${tenant?.name} — ${invoice.month} ${invoice.year}`,
+              html: `
+                <div style="font-family: Arial, sans-serif; max-width: 520px; margin: 0 auto; background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.08);">
+                  <div style="background: linear-gradient(135deg, #dc2626, #b91c1c); padding: 28px; text-align: center;">
+                    <h1 style="color: white; margin: 0; font-size: 22px;">🔴 বকেয়া ভাড়া সতর্কতা</h1>
+                  </div>
+                  <div style="padding: 28px;">
+                    <p style="color: #333;">প্রিয় <strong>${owner.fullName}</strong>,</p>
+                    <p style="color: #666;">আপনার ভাড়াটিয়া <strong>${tenant?.name}</strong> এর <strong>${invoice.month} ${invoice.year}</strong> মাসের ভাড়া <strong style="color: #dc2626;">৳${invoice.dueAmount.toLocaleString()}</strong> এখনো পরিশোধ করা হয়নি।</p>
+                    <p style="color: #666;">ডেডলাইন ছিল: <strong>${dueDate.toLocaleDateString("bn-BD")}</strong></p>
+                    <a href="${process.env.FRONTEND_URL || "http://localhost:5173"}/payments" style="display:inline-block; margin-top:16px; padding:12px 24px; background:#7c3aed; color:white; border-radius:8px; text-decoration:none; font-weight:bold;">ড্যাশবোর্ডে দেখুন</a>
+                  </div>
+                </div>
+              `,
+            });
+          })();
+        }
+
+        // reminderSentAt আপডেট করা
+        await Invoice.findByIdAndUpdate(invoice._id, { reminderSentAt: now });
+      }
+
+      console.log(`✅ Rent reminders sent: ${sent}`);
+    } catch (err) {
+      console.error("❌ Rent reminder scheduler error:", err);
+    }
+  }, { timezone: "Asia/Dhaka" });
+
+  console.log("✅ Rent due reminder scheduler started (runs daily at 9 AM).");
 };
+
