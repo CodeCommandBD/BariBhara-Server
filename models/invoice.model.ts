@@ -77,6 +77,10 @@ const invoiceSchema = new mongoose.Schema({
     type: String,
     default: "",
   },
+  reminderSentAt: {
+    type: Date,
+    default: null,
+  },
   createdAt: {
     type: Date,
     default: Date.now,
