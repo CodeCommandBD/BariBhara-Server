@@ -62,6 +62,22 @@ app.use(cors({
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json({ limit: "10mb" })); // JSON size সীমা
 
+// NoSQL Injection Protection (কাস্টম মিডলওয়্যার - সিকিউরিটি প্রটেকশন সব রাউটের পূর্বে)
+app.use((req, res, next) => {
+  const sanitize = (obj: any) => {
+    if (obj instanceof Object) {
+      for (const key in obj) {
+        if (key.startsWith("$")) delete obj[key];
+        else sanitize(obj[key]);
+      }
+    }
+  };
+  sanitize(req.body);
+  sanitize(req.query);
+  sanitize(req.params);
+  next();
+});
+
 // ৪. Passport Initialize
 app.use(passport.initialize());
 
@@ -112,7 +128,7 @@ app.use("/api/profile", profileRouter);
 // ১১. মেইনটেন্যান্স ট্র্যাকিং
 app.use("/api/maintenance", maintenanceRouter);
 
-// ১২. গ্লোবাল সার্চ — বিশেষ সার্চ রেট লিমিট
+// 🔍 গ্লোবাল সার্চ — বিশেষ সার্চ রেট লিমিট
 app.use("/api/search", searchLimiter, searchRouter);
 
 // ১৩. Real-time Notifications
@@ -129,22 +145,6 @@ app.use("/api/documents", documentRouter);
 
 // ১৭. Two-Factor Authentication — বিশেষ কঠোর রেট লিমিট
 app.use("/api/2fa", authLimiter, twofaRouter);
-
-// NoSQL Injection Protection (কাস্টম মিডলওয়্যার)
-app.use((req, res, next) => {
-  const sanitize = (obj: any) => {
-    if (obj instanceof Object) {
-      for (const key in obj) {
-        if (key.startsWith("$")) delete obj[key];
-        else sanitize(obj[key]);
-      }
-    }
-  };
-  sanitize(req.body);
-  sanitize(req.query);
-  sanitize(req.params);
-  next();
-});
 
 // ১৮. WhatsApp Bot Integration
 app.use("/api/whatsapp", whatsappRouter);
