@@ -4,12 +4,13 @@ import { v2 as cloudinary } from "cloudinary";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
+import axios from "axios";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-export const generateAgreementPDF = async (data: any, terms: string): Promise<string> => {
-  return new Promise((resolve, reject) => {
+export const generateAgreementPDF = async (data: any, terms: string, signatureUrl?: string): Promise<string> => {
+  return new Promise(async (resolve, reject) => {
     try {
       const doc = new PDFDocument({ size: "A4", margin: 50 });
       
@@ -26,6 +27,17 @@ export const generateAgreementPDF = async (data: any, terms: string): Promise<st
         }
       } catch (e) {
         console.error("Font Error:", e);
+      }
+
+      // স্বাক্ষর ডাউনলোড করা (যদি থাকে)
+      let signatureBuffer: Buffer | null = null;
+      if (signatureUrl) {
+        try {
+          const response = await axios.get(signatureUrl, { responseType: "arraybuffer" });
+          signatureBuffer = Buffer.from(response.data);
+        } catch (err) {
+          console.error("Failed to download signature image:", err);
+        }
       }
 
       const writeText = (text: string, size = 12, options = {}) => {
@@ -98,6 +110,15 @@ export const generateAgreementPDF = async (data: any, terms: string): Promise<st
       const currentY = doc.y;
       doc.fontSize(12).text("------------------------------------------", 50, currentY);
       doc.text("বাড়িওয়ালার স্বাক্ষর", 50, currentY + 15);
+
+      // স্বাক্ষর ইমেজ ড্র করা
+      if (signatureBuffer) {
+        try {
+          doc.image(signatureBuffer, 350, currentY - 45, { width: 120, height: 40 });
+        } catch (err) {
+          console.error("Failed to embed signature into PDF:", err);
+        }
+      }
 
       doc.text("------------------------------------------", 350, currentY);
       doc.text("ভাড়াটিয়ার স্বাক্ষর (ডিজিটাল)", 350, currentY + 15);

@@ -146,3 +146,82 @@ export const updateUserVerification = async (req: Request, res: Response): Promi
         res.status(500).json({ message: "Internal server error" });
     }
 };
+
+// ৫. Admin Revenue Stats — Platform-wide payout & revenue tracking
+export const getAdminRevenueStats = async (req: Request, res: Response): Promise<void> => {
+    try {
+        // সাবস্ক্রিপশন ডাটা
+        const allApprovedSubs = await Subscription.find({ status: "approved" });
+        const totalRevenue = allApprovedSubs.reduce((sum, s) => sum + s.amount, 0);
+
+        // প্ল্যান ডিস্ট্রিবিউশন
+        const planDist = await Subscription.aggregate([
+            { $match: { status: "approved" } },
+            { $group: { _id: "$plan", count: { $sum: 1 }, revenue: { $sum: "$amount" } } },
+        ]);
+
+        // গত ১২ মাসের মাসিক রেভিনিউ ট্রেন্ড
+        const months: any[] = [];
+        const now = new Date();
+        const monthNames = ["জান", "ফেব", "মার", "এপ্র", "মে", "জুন", "জুল", "আগ", "সেপ", "অক্ট", "নভ", "ডিস"];
+        for (let i = 11; i >= 0; i--) {
+            const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+            const start = new Date(d.getFullYear(), d.getMonth(), 1);
+            const end = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59);
+            const subs = await Subscription.find({ status: "approved", createdAt: { $gte: start, $lte: end } });
+            const newUsers = await User.countDocuments({ createdAt: { $gte: start, $lte: end }, role: { $ne: "admin" } });
+            months.push({
+                month: `${monthNames[d.getMonth()]} '${String(d.getFullYear()).slice(-2)}`,
+                revenue: subs.reduce((sum, s) => sum + s.amount, 0),
+                newUsers,
+                subscriptions: subs.length,
+            });
+        }
+
+        // Active subscriptions count
+        const activeSubscribers = await User.countDocuments({ subscriptionStatus: "active" });
+
+        // Top 10 paying landlords
+        const topLandlords = await Subscription.aggregate([
+            { $match: { status: "approved" } },
+            { $group: { _id: "$userId", totalPaid: { $sum: "$amount" }, count: { $sum: 1 } } },
+            { $sort: { totalPaid: -1 } },
+            { $limit: 10 },
+            { $lookup: { from: "users", localField: "_id", foreignField: "_id", as: "user" } },
+            { $unwind: "$user" },
+            { $project: { "user.fullName": 1, "user.email": 1, "user.subscriptionPlan": 1, totalPaid: 1, count: 1, _id: 0 } },
+        ]);
+
+        // Platform-wide stats
+        const totalUsers = await User.countDocuments({ role: { $ne: "admin" } });
+        const totalLandlords = await User.countDocuments({ role: "landlord" });
+        const totalTenants = await User.countDocuments({ role: "tenant" });
+        const totalProperties = await Property.countDocuments();
+
+        // MRR — current month revenue
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        const currentMonthSubs = await Subscription.find({ status: "approved", createdAt: { $gte: startOfMonth } });
+        const mrr = currentMonthSubs.reduce((sum, s) => sum + s.amount, 0);
+
+        res.status(200).json({
+            success: true,
+            revenue: {
+                totalRevenue,
+                mrr,
+                activeSubscribers,
+                planDistribution: planDist,
+                monthlyTrend: months,
+                topLandlords,
+                platformStats: {
+                    totalUsers,
+                    totalLandlords,
+                    totalTenants,
+                    totalProperties,
+                },
+            },
+        });
+    } catch (error) {
+        console.error("Error fetching admin revenue stats:", error);
+        res.status(500).json({ message: "Internal server error" });
+    }
+};
