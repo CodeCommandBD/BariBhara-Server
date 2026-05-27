@@ -33,7 +33,7 @@ export const generateInvoice = async (req: Req, res: Res) => {
       electricityBill, 
       serviceCharge, 
       otherBill,
-      dueDate 
+      dueDate
     } = req.body;
 
     if (!tenantId || !mongoose.Types.ObjectId.isValid(tenantId)) {

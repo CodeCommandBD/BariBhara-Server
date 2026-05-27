@@ -372,7 +372,11 @@ export const signAgreement = async (req: Req, res: Res) => {
       return res.status(400).json({ success: false, message: "স্বাক্ষর প্রয়োজন!" });
     }
 
-    const tenant = await Tenant.findById(tenantId);
+    const tenant = await Tenant.findById(tenantId)
+      .populate("unit", "unitName")
+      .populate("property", "name")
+      .populate("owner", "fullName agreementTemplate");
+
     if (!tenant) {
       return res.status(404).json({ success: false, message: "ভাড়াটিয়া খুঁজে পাওয়া যায়নি!" });
     }
@@ -386,8 +390,23 @@ export const signAgreement = async (req: Req, res: Res) => {
       folder: "signatures",
     });
 
+    // dynamic PDF regeneration with signature image
+    const updatedPdfUrl = await generateAgreementPDF(
+      {
+        tenantName: tenant.name,
+        propertyName: (tenant.property as any)?.name ?? "N/A",
+        unitName: (tenant.unit as any)?.unitName ?? "N/A",
+        rentAmount: tenant.rentAmount,
+        startDate: tenant.leaseStart,
+        endDate: tenant.leaseEnd || "Auto-renew",
+        landlordName: (tenant.owner as any)?.fullName ?? "মালিক",
+      },
+      (tenant.owner as any)?.agreementTemplate || "",
+      result.secure_url
+    );
+
     tenant.agreement = {
-      ...(tenant.agreement || {}),
+      pdfUrl: updatedPdfUrl,
       signatureUrl: result.secure_url,
       isSigned: true,
       signedAt: new Date(),
@@ -416,6 +435,64 @@ export const deleteAgreement = async (req: Req, res: Res) => {
     await tenant.save();
 
     res.status(200).json({ success: true, message: "চুক্তিপত্র সফলভাবে মুছে ফেলা হয়েছে!" });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ১১. NID Verification (Landlord)
+export const verifyTenantNID = async (req: Req, res: Res) => {
+  try {
+    const ownerId = (req as any).user.id;
+    const { id } = req.params;
+    const { status, rejectionReason } = req.body;
+
+    if (!["verified", "rejected"].includes(status)) {
+      return res.status(400).json({ success: false, message: "অবাধ্য স্ট্যাটাস!" });
+    }
+
+    const tenant = await Tenant.findOne({ _id: id, owner: ownerId });
+    if (!tenant) return res.status(404).json({ success: false, message: "ভাড়াটিয়া পাওয়া যায়নি!" });
+
+    if (!tenant.nidVerification) {
+      tenant.nidVerification = {} as any;
+    }
+
+    tenant.nidVerification!.status = status;
+    if (status === "verified") {
+      tenant.nidVerification!.verifiedAt = new Date();
+      tenant.nidVerification!.rejectionReason = undefined as any;
+    } else {
+      tenant.nidVerification!.rejectionReason = rejectionReason;
+    }
+
+    await tenant.save();
+
+    res.status(200).json({ success: true, message: `NID ${status === "verified" ? "অনুমোদিত" : "বাতিল"} হয়েছে!`, tenant });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ১২. ইউটিলিটি কনফিগারেশন আপডেট করা (Landlord)
+export const updateTenantUtilities = async (req: Req, res: Res) => {
+  try {
+    const ownerId = (req as any).user.id;
+    const { id } = req.params;
+    const { utilityConfig } = req.body;
+
+    if (!utilityConfig) {
+      return res.status(400).json({ success: false, message: "ইউটিলিটি ডেটা প্রদান করা হয়নি!" });
+    }
+
+    const tenant = await Tenant.findOne({ _id: id, owner: ownerId });
+    if (!tenant) return res.status(404).json({ success: false, message: "ভাড়াটিয়া পাওয়া যায়নি!" });
+
+    tenant.utilityConfig = utilityConfig;
+
+    await tenant.save();
+
+    res.status(200).json({ success: true, message: "ইউটিলিটি সেটিংস সফলভাবে সেভ করা হয়েছে!", tenant });
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });
   }

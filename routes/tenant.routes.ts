@@ -1,5 +1,6 @@
 import express from "express";
 import { isAuthenticated } from "../middleware/isAuthenticated.js";
+import { isTenantAuthenticated } from "../middleware/isTenantAuthenticated.js";
 import upload from "../middleware/upload.js";
 import {
   addTenant,
@@ -11,7 +12,9 @@ import {
   renewLease,
   generateAgreement,
   signAgreement,
-  deleteAgreement
+  deleteAgreement,
+  verifyTenantNID,
+  updateTenantUtilities
 } from "../controller/tenant.controller.js";
 
 const tenantRouter = express.Router();
@@ -25,8 +28,14 @@ tenantRouter.get("/all", isAuthenticated, getAllTenants);
 // একটি নির্দিষ্ট ইউনিটের ভাড়াটিয়া
 tenantRouter.get("/unit/:unitId", isAuthenticated, getTenantByUnit);
 
-// ভাড়াটিয়ার তথ্য আপডেট
+// ভাড়াতিয়ার তথ্য আপডেট
 tenantRouter.put("/:id", isAuthenticated, upload.array("photo", 1), updateTenant);
+
+// NID Verify by Landlord
+tenantRouter.patch("/:id/verify-nid", isAuthenticated, verifyTenantNID);
+
+// ইউটিলিটি সেটিংস আপডেট
+tenantRouter.patch("/:id/utilities", isAuthenticated, updateTenantUtilities);
 
 // ভাড়াটিয়া সরানো (ইউনিট খালি করা)
 tenantRouter.patch("/vacate/:id", isAuthenticated, vacateTenant);
@@ -39,7 +48,7 @@ tenantRouter.post("/:id/renew-lease", isAuthenticated, renewLease);
 
 // ডিজিটাল চুক্তিপত্র (Digital Agreement)
 tenantRouter.post("/:id/generate-agreement", isAuthenticated, generateAgreement);
-tenantRouter.post("/sign-agreement", isAuthenticated, signAgreement);
+tenantRouter.post("/sign-agreement", isTenantAuthenticated, signAgreement);
 tenantRouter.delete("/:id/agreement", isAuthenticated, deleteAgreement);
 
 export default tenantRouter;

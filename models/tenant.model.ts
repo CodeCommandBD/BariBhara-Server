@@ -45,6 +45,16 @@ const tenantSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+    nidVerification: {
+      status: {
+        type: String,
+        enum: ["unsubmitted", "pending", "verified", "rejected"],
+        default: "unsubmitted",
+      },
+      submittedAt: { type: Date },
+      verifiedAt: { type: Date },
+      rejectionReason: { type: String },
+    },
 
     // ৩. পোর্টাল অ্যাক্সেস (Tenant Login)
     portalPassword: {
@@ -84,6 +94,32 @@ const tenantSchema = new mongoose.Schema(
       default: 12,
       min: 1,
       max: 60,
+    },
+
+    // ৫. ইউটিলিটি কনফিগারেশন (Utility Config)
+    utilityConfig: {
+      electricity: {
+        type: { type: String, enum: ["Fixed", "Metered", "None"], default: "None" },
+        fixedAmount: { type: Number, default: 0 },
+        perUnitCost: { type: Number, default: 0 },
+        lastReading: { type: Number, default: 0 },
+      },
+      gas: {
+        type: { type: String, enum: ["Fixed", "Metered", "None"], default: "None" },
+        fixedAmount: { type: Number, default: 0 },
+        perUnitCost: { type: Number, default: 0 },
+        lastReading: { type: Number, default: 0 },
+      },
+      water: {
+        type: { type: String, enum: ["Fixed", "Metered", "None"], default: "None" },
+        fixedAmount: { type: Number, default: 0 },
+        perUnitCost: { type: Number, default: 0 },
+        lastReading: { type: Number, default: 0 },
+      },
+      serviceCharge: {
+        type: { type: String, enum: ["Fixed", "None"], default: "None" },
+        fixedAmount: { type: Number, default: 0 },
+      }
     },
 
     // ৬. ডকুমেন্টস (Documents)
