@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import mongoose from "mongoose";
 import { v2 as cloudinary } from "cloudinary";
 import Tenant from "../models/tenant.model.js";
+import User from "../models/user.model.js";
 import Invoice from "../models/invoice.model.js";
 import Maintenance from "../models/maintenance.model.js";
 import TenantNotification from "../models/tenantNotification.model.js";
@@ -461,6 +462,88 @@ export const changePortalPassword = async (req: Req, res: Res) => {
     (tenant as any).portalPassword = newPassword; // pre-save hook hash করবে
     await tenant.save();
     res.json({ success: true, message: "পাসওয়ার্ড সফলভাবে পরিবর্তন করা হয়েছে!" });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// ১৩. বাড়িওয়ালাকে রেটিং দেওয়া
+export const rateLandlord = async (req: Req, res: Res) => {
+  try {
+    const tenantId = (req as any).user.id;
+    const { behavior, maintenance, review } = req.body;
+
+    if (behavior === undefined || maintenance === undefined) {
+      res.status(400).json({ success: false, message: "সকল ক্যাটাগরির রেটিং প্রদান করা আবশ্যক!" });
+      return;
+    }
+
+    const behaviorScore = Number(behavior);
+    const maintenanceScore = Number(maintenance);
+
+    if (behaviorScore < 0 || behaviorScore > 5 || maintenanceScore < 0 || maintenanceScore > 5) {
+      res.status(400).json({ success: false, message: "রেটিং 0 থেকে 5 এর মধ্যে হতে হবে।" });
+      return;
+    }
+
+    const overallScore = Math.round(((behaviorScore + maintenanceScore) / 2) * 10) / 10;
+
+    // ফাইন্ড টেন্যান্ট এবং মালিক (owner)
+    const tenant = await Tenant.findById(tenantId);
+    if (!tenant) {
+      res.status(404).json({ success: false, message: "ভাড়াটিয়া পাওয়া যায়নি!" });
+      return;
+    }
+
+    const ownerId = tenant.owner;
+    const owner = await User.findById(ownerId);
+    if (!owner) {
+      res.status(404).json({ success: false, message: "বাড়িওয়ালা পাওয়া যায়নি!" });
+      return;
+    }
+
+    const ratingDoc = (owner as any).landlordRating || { average: {}, reviews: [], totalRatings: 0 };
+    const existingReviewIndex = ratingDoc.reviews.findIndex((r: any) => r.tenantId.toString() === tenantId.toString());
+
+    if (existingReviewIndex !== -1) {
+      // Update existing review
+      ratingDoc.reviews[existingReviewIndex].behavior = behaviorScore;
+      ratingDoc.reviews[existingReviewIndex].maintenance = maintenanceScore;
+      ratingDoc.reviews[existingReviewIndex].overall = overallScore;
+      ratingDoc.reviews[existingReviewIndex].review = review || "";
+      ratingDoc.reviews[existingReviewIndex].createdAt = new Date();
+    } else {
+      // Add new review
+      ratingDoc.reviews.push({
+        tenantId: tenantId,
+        behavior: behaviorScore,
+        maintenance: maintenanceScore,
+        overall: overallScore,
+        review: review || "",
+        createdAt: new Date(),
+      });
+      ratingDoc.totalRatings += 1;
+    }
+
+    // Recalculate averages
+    const totalReviews = ratingDoc.reviews.length;
+    let sumBehavior = 0, sumMaintenance = 0, sumOverall = 0;
+    ratingDoc.reviews.forEach((r: any) => {
+      sumBehavior += r.behavior;
+      sumMaintenance += r.maintenance;
+      sumOverall += r.overall;
+    });
+
+    ratingDoc.average = {
+      behavior: Math.round((sumBehavior / totalReviews) * 10) / 10,
+      maintenance: Math.round((sumMaintenance / totalReviews) * 10) / 10,
+      overall: Math.round((sumOverall / totalReviews) * 10) / 10,
+    };
+
+    (owner as any).landlordRating = ratingDoc;
+    await owner.save();
+
+    res.status(200).json({ success: true, message: "রেটিং সফলভাবে সাবমিট করা হয়েছে!", landlordRating: ratingDoc });
   } catch (err: any) {
     res.status(500).json({ success: false, message: err.message });
   }
