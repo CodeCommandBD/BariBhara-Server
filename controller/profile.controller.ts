@@ -17,7 +17,9 @@ cloudinary.config({
 export const getProfile = async (req: Req, res: Res) => {
   try {
     const userId = (req as any).user.id as string;
-    const user = await User.findById(userId).select("-password");
+    const user = await User.findById(userId)
+      .select("-password")
+      .populate("landlordRating.reviews.tenantId", "fullName photo");
     if (!user) return res.status(404).json({ success: false, message: "ইউজার পাওয়া যায়নি!" });
 
     // Check and update subscription expiration
