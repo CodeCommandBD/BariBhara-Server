@@ -14,7 +14,8 @@ import {
   signAgreement,
   deleteAgreement,
   verifyTenantNID,
-  updateTenantUtilities
+  updateTenantUtilities,
+  rateTenant
 } from "../controller/tenant.controller.js";
 
 const tenantRouter = express.Router();
@@ -36,6 +37,9 @@ tenantRouter.patch("/:id/verify-nid", isAuthenticated, verifyTenantNID);
 
 // ইউটিলিটি সেটিংস আপডেট
 tenantRouter.patch("/:id/utilities", isAuthenticated, updateTenantUtilities);
+
+// রেটিং আপডেট
+tenantRouter.patch("/:id/rating", isAuthenticated, rateTenant);
 
 // ভাড়াটিয়া সরানো (ইউনিট খালি করা)
 tenantRouter.patch("/vacate/:id", isAuthenticated, vacateTenant);
