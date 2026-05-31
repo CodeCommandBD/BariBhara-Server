@@ -16,6 +16,7 @@ import {
   updateTenantProfile,
   uploadTenantNID,
   changePortalPassword,
+  rateLandlord
 } from "../controller/tenantPortal.controller.js";
 
 const tenantPortalRouter = express.Router();
@@ -45,6 +46,7 @@ tenantPortalRouter.get("/me", isTenantAuthenticated, getTenantProfile);
 tenantPortalRouter.patch("/profile", isTenantAuthenticated, updateTenantProfile);
 tenantPortalRouter.post("/nid/upload", isTenantAuthenticated, uploadTenantNID);
 tenantPortalRouter.patch("/change-password", isTenantAuthenticated, changePortalPassword);
+tenantPortalRouter.patch("/rate-landlord", isTenantAuthenticated, rateLandlord);
 
 // ====================================================
 // Landlord Route — Portal Access Management

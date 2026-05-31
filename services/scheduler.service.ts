@@ -5,6 +5,7 @@ import User from "../models/user.model.js";
 import Property from "../models/property.model.js";
 import nodemailer from "nodemailer";
 import { sendRentReminderEmail } from "./email.service.js";
+import { sendPushNotification } from "../controller/push.controller.js";
 
 // Email transporter
 const transporter = nodemailer.createTransport({
@@ -202,6 +203,13 @@ export const startScheduler = () => {
               `,
             });
           })();
+
+          // Send Push Notification
+          await sendPushNotification(owner._id.toString(), {
+            title: "🔴 বকেয়া ভাড়া সতর্কতা",
+            body: `ভাড়াটিয়া ${tenant?.name} এর ${invoice.month} মাসের ভাড়া ৳${invoice.dueAmount} বকেয়া আছে।`,
+            url: "/rent",
+          });
         }
 
         // reminderSentAt আপডেট করা

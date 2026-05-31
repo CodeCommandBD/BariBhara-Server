@@ -140,6 +140,16 @@ const tenantSchema = new mongoose.Schema(
       signedAt: { type: Date, default: null },
     },
 
+    // ৯. রেটিং সিস্টেম (Rating System)
+    rating: {
+      behavior: { type: Number, min: 0, max: 5, default: 0 },
+      payment: { type: Number, min: 0, max: 5, default: 0 },
+      cleanliness: { type: Number, min: 0, max: 5, default: 0 },
+      overall: { type: Number, min: 0, max: 5, default: 0 },
+      review: { type: String, default: "" },
+      updatedAt: { type: Date, default: null },
+    },
+
     // ৭. স্ট্যাটাস (Status)
     status: {
       type: String,

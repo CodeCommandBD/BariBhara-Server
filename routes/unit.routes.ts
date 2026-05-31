@@ -1,5 +1,6 @@
 import express from "express";
 import { isAuthenticated } from "../middleware/isAuthenticated.js";
+import upload from "../middleware/upload.js";
 import {
   createUnit,
   getUnitsByProperty,
@@ -13,6 +14,7 @@ const unitRouter = express.Router();
 unitRouter.post(
   "/add-unit",
   isAuthenticated,
+  upload.array("images", 5),
   createUnit
 );
 
@@ -24,7 +26,7 @@ unitRouter.get(
 );
 
 // ইউনিটের তথ্য আপডেট করার রাস্তা
-unitRouter.put("/:unitId", isAuthenticated, updateUnit);
+unitRouter.put("/:unitId", isAuthenticated, upload.array("images", 5), updateUnit);
 
 // ইউনিট ডিলিট করার রাস্তা
 unitRouter.delete("/:unitId", isAuthenticated, deleteUnit);

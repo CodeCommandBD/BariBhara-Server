@@ -27,6 +27,8 @@ import whatsappRouter from "../routes/whatsapp.routes.js";
 import subscriptionRouter from "../routes/subscription.routes.js";
 import adminRouter from "../routes/admin.routes.js";
 import publicRouter from "../routes/public.routes.js";
+import pushRouter from "../routes/push.routes.js";
+import analyticsRouter from "../routes/analytics.routes.js";
 import { startScheduler } from "../services/scheduler.service.js";
 import { seedAdmin } from "../services/seedAdmin.js";
 import { seedPlans } from "../services/seedPlans.js";
@@ -158,7 +160,13 @@ app.use("/api/admin", adminRouter);
 // ২১. Public Routes
 app.use("/api/public", publicRouter);
 
-// ২১. Start Scheduler (Lease Auto-renewal)
+// ২২. Web Push Routes
+app.use("/api/push", pushRouter);
+
+// ২৩. Analytics Tracking
+app.use("/api/analytics", analyticsRouter);
+
+// ২৩. Start Scheduler (Lease Auto-renewal)
 startScheduler();
 
 // ২২. Seed Default Admin

@@ -5,7 +5,7 @@ import Property from "../models/property.model.js";
 // ৩. নতুন ইউনিট (Flat/Room) অ্যাড করা
 export const createUnit = async (req: Req, res: Res) => {
   try {
-    const { property, unitName, floor, type, rent, status } = req.body;
+    const { property, unitName, floor, type, rent, status, bedrooms, bathrooms, area } = req.body;
     const userId = (req as any).user.id;
 
     // ১. প্রথমে চেক করবো এই বাড়িটি কার?
@@ -25,6 +25,10 @@ export const createUnit = async (req: Req, res: Res) => {
       });
     }
 
+    // ৩. ছবি আপলোড হ্যান্ডলিং
+    const files = req.files as Express.Multer.File[];
+    const imageUrls = files && files.length > 0 ? files.map((file) => file.path.replace(/\\/g, "/")) : [];
+
     const newUnit = new Unit({
       property, // কোন বিল্ডিং-এর জন্য ইউনিট তৈরি হচ্ছে
       unitName,
@@ -32,6 +36,10 @@ export const createUnit = async (req: Req, res: Res) => {
       type,
       rent,
       status,
+      bedrooms: bedrooms ? Number(bedrooms) : 1,
+      bathrooms: bathrooms ? Number(bathrooms) : 1,
+      area: area ? Number(area) : 0,
+      images: imageUrls,
     });
 
     await newUnit.save();
@@ -69,14 +77,34 @@ export const updateUnit = async (req: Req, res: Res) => {
     // ক. রিকোয়েস্ট প্যারামিটার (URL) থেকে ইউনিটের আইডিটি নিচ্ছি
     const { unitId } = req.params;
 
-    // খ. ডাটাবেসে মঙ্গুজ (Mongoose) এর মাধ্যমে আইডি দিয়ে ইউনিটটি খুঁজে বের করা এবং আপডেট করা
-    // 'req.body' দিয়ে আমরা ফ্রন্টএন্ড থেকে আসা নতুন তথ্যগুলো পাঠিয়ে দিচ্ছি
-    // '{ new: true }' মানে হলো আপডেট হওয়ার পর নতুন ডাটাটি ভেরিয়েবলে আসবে
+    // খ. বিদ্যমান ছবিগুলো (যেগুলো ডিলিট করা হয়নি)
+    let existingImages = req.body.existingImages || [];
+    if (typeof existingImages === "string") {
+      existingImages = [existingImages];
+    }
 
-    const updatedUnit = await Unit.findByIdAndUpdate(unitId, req.body, {
-      new: true,
-      runValidators: true, // এটি নিশ্চিত করবে যে নতুন ডাটা আমাদের মডেলের নিয়ম মানছে কি না
-    });
+    // গ. নতুন আপলোড করা ছবিগুলো
+    const files = req.files as Express.Multer.File[];
+    const newImagePaths = files ? files.map((file) => file.path.replace(/\\/g, "/")) : [];
+
+    // ঘ. আগের এবং নতুন ছবিগুলোকে একসাথে যোগ করা
+    const finalImages = [...existingImages, ...newImagePaths];
+
+    // ঙ. ডাটা আপডেট করা
+    const updateData = { ...req.body };
+    delete updateData.existingImages;
+    if (updateData.bedrooms !== undefined) updateData.bedrooms = Number(updateData.bedrooms);
+    if (updateData.bathrooms !== undefined) updateData.bathrooms = Number(updateData.bathrooms);
+    if (updateData.area !== undefined) updateData.area = Number(updateData.area);
+
+    const updatedUnit = await Unit.findByIdAndUpdate(
+      unitId,
+      { ...updateData, images: finalImages },
+      {
+        new: true,
+        runValidators: true,
+      }
+    );
 
     // গ. যদি ওই আইডি দিয়ে কোনো ইউনিট খুঁজে না পাওয়া যায়
     if (!updatedUnit) {
@@ -96,7 +124,7 @@ export const updateUnit = async (req: Req, res: Res) => {
     // ঙ. কোনো টেকনিক্যাল এরর হলে ইউজারকে জানানো
     res.status(500).json({
       success: false,
-      message: "ইউনিট আপডেট করতে সমস্যা হয়েছে!",
+      message: `Error: ${error.message}`,
       error: error.message,
     });
   }

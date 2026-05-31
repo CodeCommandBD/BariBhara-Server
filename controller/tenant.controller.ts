@@ -497,3 +497,48 @@ export const updateTenantUtilities = async (req: Req, res: Res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+// ১৩. ভাড়াটিয়ার রেটিং আপডেট করা
+export const rateTenant = async (req: Req, res: Res) => {
+  try {
+    const ownerId = (req as any).user.id;
+    const { id } = req.params;
+    const { behavior, payment, cleanliness, review } = req.body;
+
+    if (behavior === undefined || payment === undefined || cleanliness === undefined) {
+      return res.status(400).json({ success: false, message: "সকল ক্যাটাগরির রেটিং প্রদান করা আবশ্যক!" });
+    }
+
+    const tenant = await Tenant.findOne({ _id: id, owner: ownerId });
+    if (!tenant) return res.status(404).json({ success: false, message: "ভাড়াটিয়া পাওয়া যায়নি!" });
+
+    const behaviorScore = Number(behavior);
+    const paymentScore = Number(payment);
+    const cleanlinessScore = Number(cleanliness);
+
+    if (
+      behaviorScore < 0 || behaviorScore > 5 ||
+      paymentScore < 0 || paymentScore > 5 ||
+      cleanlinessScore < 0 || cleanlinessScore > 5
+    ) {
+      return res.status(400).json({ success: false, message: "রেটিং 0 থেকে 5 এর মধ্যে হতে হবে।" });
+    }
+
+    const overallScore = Math.round(((behaviorScore + paymentScore + cleanlinessScore) / 3) * 10) / 10;
+
+    tenant.rating = {
+      behavior: behaviorScore,
+      payment: paymentScore,
+      cleanliness: cleanlinessScore,
+      overall: overallScore,
+      review: review || "",
+      updatedAt: new Date(),
+    };
+
+    await tenant.save();
+
+    res.status(200).json({ success: true, message: "রেটিং সফলভাবে আপডেট করা হয়েছে!", tenant });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};

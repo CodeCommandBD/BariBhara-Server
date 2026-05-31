@@ -22,81 +22,88 @@ export async function getPublicProperties(req: Request, res: Response): Promise<
     const limitNum = Math.min(50, parseInt(limit as string) || 12);
     const skip = (pageNum - 1) * limitNum;
 
-    // বেস ফিল্টার — শুধু পাবলিক ও অ্যাভেইলেবল
-    const filter: any = { isPublic: true, status: "available" };
-
-    // লোকেশন টেক্সট সার্চ (address এবং location ফিল্ড)
-    if (location && String(location).trim()) {
-      const searchReg = new RegExp(String(location).trim(), "i");
-      filter.$or = [
-        { address: searchReg },
-        { location: searchReg },
-        { name: searchReg },
-        { description: searchReg },
-      ];
-    }
+    // আমরা এখন Properties এর বদলে সরাসরি Units ফেচ করবো
+    const unitFilter: any = { status: { $in: ["খালি", "available"] } };
 
     // টাইপ ফিল্টার
     if (type && type !== "all") {
-      filter.type = type;
+      unitFilter.type = type;
     }
 
-    // সর্ট অপশন
-    let sortOption: any = { createdAt: -1 }; // ডিফল্ট: সর্বশেষ আগে
-    if (sort === "oldest") sortOption = { createdAt: 1 };
+    // রেট ফিল্টার
+    if (minRent) unitFilter.rent = { ...unitFilter.rent, $gte: parseInt(minRent as string) };
+    if (maxRent) unitFilter.rent = { ...unitFilter.rent, $lte: parseInt(maxRent as string) };
 
-    const [properties, total] = await Promise.all([
-      Property.find(filter)
-        .populate("owner", "fullName phoneNumber email phone isVerified photo")
-        .sort(sortOption)
-        .skip(skip)
-        .limit(limitNum),
-      Property.countDocuments(filter),
-    ]);
+    let unitSortOption: any = { createdAt: -1 };
+    if (sort === "oldest") unitSortOption = { createdAt: 1 };
+    if (sort === "rent_asc") unitSortOption = { rent: 1 };
+    if (sort === "rent_desc") unitSortOption = { rent: -1 };
 
-    // প্রতিটি প্রোপার্টির rent range এবং unit details
-    const propertiesWithRanges = await Promise.all(
-      properties.map(async (p) => {
-        const units = await Unit.find({ property: p._id });
-        const rents = units.map((u) => u.rent).filter((r) => typeof r === "number" && r > 0);
-        const minRentVal = rents.length > 0 ? Math.min(...rents) : 0;
-        const maxRentVal = rents.length > 0 ? Math.max(...rents) : 0;
-        const availableUnits = units.filter(u => u.status === "খালি").length;
-
-        return {
-          ...p.toObject(),
-          minRent: minRentVal,
-          maxRent: maxRentVal,
-          unitCount: units.length,
-          availableUnits,
-          units: units.map(u => ({
-            _id: u._id,
-            unitName: u.unitName,
-            floor: u.floor,
-            rent: u.rent,
-            status: u.status,
-            type: u.type,
-          })),
-        };
+    // ১. প্রথমে সব খালি ইউনিট ফেচ করি (যাদের প্যারেন্ট প্রপার্টি পাবলিক)
+    const units = await Unit.find(unitFilter)
+      .populate({
+        path: "property",
+        match: { isPublic: true }, // শুধুমাত্র পাবলিশ করা প্রপার্টির ইউনিট
+        populate: {
+          path: "owner",
+          select: "fullName phoneNumber email phone isVerified photo landlordRating",
+        },
       })
-    );
+      .sort(unitSortOption);
 
-    // rent range filter (unit-level) — applied after fetching
-    let filtered = propertiesWithRanges;
-    if (minRent) filtered = filtered.filter(p => p.maxRent >= parseInt(minRent as string));
-    if (maxRent) filtered = filtered.filter(p => p.minRent <= parseInt(maxRent as string));
+    // ২. যেসব ইউনিটের প্রপার্টি পাবলিশ করা নেই, সেগুলো বাদ দেওয়া
+    let validUnits = units.filter((u: any) => u.property !== null);
 
-    // sort by rent after filter
-    if (sort === "rent_asc") filtered.sort((a, b) => a.minRent - b.minRent);
-    if (sort === "rent_desc") filtered.sort((a, b) => b.minRent - a.minRent);
+    // ৩. লোকেশন টেক্সট সার্চ (address এবং location ফিল্ড প্রপার্টিতে আছে)
+    if (location && String(location).trim()) {
+      const searchReg = new RegExp(String(location).trim(), "i");
+      validUnits = validUnits.filter((u: any) => {
+        const p = u.property;
+        return (
+          searchReg.test(p.address || "") ||
+          searchReg.test(p.location || "") ||
+          searchReg.test(p.name || "") ||
+          searchReg.test(p.description || "")
+        );
+      });
+    }
+
+    const totalValidUnits = validUnits.length;
+    
+    // ৪. পেজিনেশন অ্যাপ্লাই করা
+    const paginatedUnits = validUnits.slice(skip, skip + limitNum);
+
+    // ৫. ফ্রন্টএন্ডের জন্য ডেটা ফরম্যাট করা
+    const formattedUnits = paginatedUnits.map((u: any) => {
+      const p = u.property;
+      return {
+        _id: u._id,
+        unitName: u.unitName,
+        rent: u.rent,
+        floor: u.floor,
+        type: u.type,
+        bedrooms: u.bedrooms || p.bedrooms || 1,
+        bathrooms: u.bathrooms || p.bathrooms || 1,
+        area: u.area || p.area || 0,
+        images: u.images && u.images.length > 0 ? u.images : p.images, // ইউনিটের ছবি না থাকলে প্রপার্টির ছবি
+        propertyId: p._id,
+        propertyName: p.name,
+        location: p.location,
+        address: p.address,
+        description: p.description,
+        contactNumber: p.contactNumber,
+        owner: p.owner,
+        isVerified: p.owner?.isVerified === "verified",
+      };
+    });
 
     res.status(200).json({
       success: true,
-      count: filtered.length,
-      total: (minRent || maxRent || sort === "rent_asc" || sort === "rent_desc") ? filtered.length : total,
-      totalPages: Math.ceil(total / limitNum),
+      count: formattedUnits.length,
+      total: totalValidUnits,
+      totalPages: Math.ceil(totalValidUnits / limitNum),
       page: pageNum,
-      data: filtered,
+      data: formattedUnits,
     });
   } catch (error: any) {
     console.error("❌ Error fetching public properties:", error);
@@ -113,7 +120,7 @@ export async function getPublicPropertyById(req: Request, res: Response): Promis
   try {
     const { id } = req.params;
     const property = await Property.findOne({ _id: id, isPublic: true })
-      .populate("owner", "fullName phone email isVerified photo");
+      .populate("owner", "fullName phone email isVerified photo landlordRating");
 
     if (!property) {
       res.status(404).json({ success: false, message: "প্রপার্টি পাওয়া যায়নি!" });
