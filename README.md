@@ -86,8 +86,8 @@ server/
    Create a `.env` file in the root of the server directory:
    ```env
    # Server Configuration
-   PORT=4000
-   NODE_ENV=development
+   PORT=
+   NODE_ENV=
    
    # Database
    MONGODB_URL=mongodb+srv://<username>:<password>@cluster...
